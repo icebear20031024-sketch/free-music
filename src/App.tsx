@@ -28,6 +28,30 @@ function MainContent({ currentView, setView, playlists, createPlaylist, removePl
   const [isSearching, setIsSearching] = useState(false);
   const [errorString, setErrorString] = useState<string | null>(null);
   const searchAbortController = useRef<AbortController | null>(null);
+
+  const [selectedSources, setSelectedSources] = useState<string[]>(() => {
+    const saved = localStorage.getItem('search_sources');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    return ['xiaoqiu', 'xiaowo', 'xiaoyun', 'xiaogou', 'xiaomi'];
+  });
+
+  const handleToggleSource = (id: string) => {
+    setSelectedSources(prev => {
+      const next = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id];
+      const final = next.length > 0 ? next : prev;
+      localStorage.setItem('search_sources', JSON.stringify(final));
+      return final;
+    });
+  };
   
   const [sortField, setSortField] = useState<SortField>(null);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
@@ -35,7 +59,7 @@ function MainContent({ currentView, setView, playlists, createPlaylist, removePl
   const { playSong, currentSong, playlist } = usePlayer();
   const { downloads, downloadSong, removeDownload, isDownloaded, isDownloading, downloadProgress } = useDownloads();
 
-  const handleSearch = async (e: React.FormEvent, overrideType?: string, overrideQuery?: string) => {
+  const handleSearch = async (e?: React.FormEvent, overrideType?: string, overrideQuery?: string) => {
     e?.preventDefault();
     const q = overrideQuery || searchQuery;
     const t = overrideType || searchType;
@@ -85,7 +109,7 @@ function MainContent({ currentView, setView, playlists, createPlaylist, removePl
            if (changed) {
                setSearchResults(Array.from(groupedResult.values()));
            }
-        }, abortController.signal);
+        }, abortController.signal, selectedSources);
       } catch (err: unknown) {
         const error = err as Error;
         if (error.message !== 'AbortError') {
@@ -112,7 +136,7 @@ function MainContent({ currentView, setView, playlists, createPlaylist, removePl
               }
            });
            setSearchResults([...allResults]);
-        }, abortController.signal);
+        }, abortController.signal, selectedSources);
       } catch (err: unknown) {
         const error = err as Error;
         if (error.message !== 'AbortError') {
@@ -267,7 +291,13 @@ function MainContent({ currentView, setView, playlists, createPlaylist, removePl
       <LyricsView />
       
       <div className="flex px-8 py-[18px] border-b border-[#EDEDF2] items-center justify-between z-10 shrink-0 bg-white/90 backdrop-blur-md sticky top-0">
-         <SearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} onSearch={handleSearch} />
+         <SearchBar 
+           searchQuery={searchQuery} 
+           setSearchQuery={setSearchQuery} 
+           onSearch={handleSearch} 
+           selectedSources={selectedSources}
+           onToggleSource={handleToggleSource}
+         />
          {currentView === 'search' && (
            <div className="flex gap-2">
              {['music', 'artist', 'album', 'sheet'].map(type => (

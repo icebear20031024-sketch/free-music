@@ -171,6 +171,9 @@ async function getMediaSource(musicItem, quality) {
             },
         })
     ).data;
+    if (!res || !res.url || (res.msg && res.msg !== "success") || res.url.includes("panspace.kuwo.cn")) {
+        throw new Error(res && res.msg ? res.msg : "无法获取播放链接");
+    }
     return {
         url: res.url,
     };

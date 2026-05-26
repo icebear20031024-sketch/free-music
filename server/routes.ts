@@ -10,12 +10,14 @@ export function setupRoutes(app: Express) {
     try {
       const query = req.query.q as string;
       const page = parseInt(req.query.page as string || '1', 10);
+      const sourcesParam = req.query.sources as string | undefined;
+      const sources = sourcesParam ? sourcesParam.split(',') : undefined;
       
       if (!query) {
         return res.status(400).json({ success: false, error: 'Missing search query' });
       }
 
-      const results = await musicService.searchMusic(query, page);
+      const results = await musicService.searchMusic(query, page, sources);
 
       res.json({ success: true, results });
     } catch (error) {
@@ -82,6 +84,8 @@ export function setupRoutes(app: Express) {
     const query = req.query.q as string;
     const page = parseInt(req.query.page as string || '1', 10);
     const type = req.query.type as string || 'music'; // use type here
+    const sourcesParam = req.query.sources as string | undefined;
+    const sources = sourcesParam ? sourcesParam.split(',') : undefined;
     
     if (!query) {
       res.status(400).end();
@@ -96,8 +100,13 @@ export function setupRoutes(app: Express) {
     // Flush headers immediately to establish the SSE connection
     res.flushHeaders();
     
+    const allPlugins = pluginManager.getAllPlugins();
+    const activePlugins = sources && sources.length > 0
+      ? allPlugins.filter(([id]) => sources.includes(id))
+      : allPlugins;
+
     Promise.allSettled(
-      pluginManager.getAllPlugins().map(async ([id, plugin]) => {
+      activePlugins.map(async ([id, plugin]) => {
         try {
           if (!plugin.search || (!plugin.supportedSearchType?.includes(type) && type !== 'music')) {
              res.write(`data: ${JSON.stringify({ sourceId: id, error: `Search type ${type} not supported` })}\n\n`);

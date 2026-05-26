@@ -17,9 +17,14 @@ export const withTimeout = <T>(promise: Promise<T>, ms: number, fallbackMsg: str
 };
 
 export class MusicService {
-  async searchMusic(query: string, page: number = 1) {
+  async searchMusic(query: string, page: number = 1, sources?: string[]) {
+    const allPlugins = pluginManager.getAllPlugins();
+    const activePlugins = sources && sources.length > 0
+      ? allPlugins.filter(([id]) => sources.includes(id))
+      : allPlugins;
+
     return Promise.all(
-      pluginManager.getAllPlugins().map(async ([id, plugin]) => {
+      activePlugins.map(async ([id, plugin]) => {
         try {
           if (!plugin.search) return { sourceId: id, error: 'No search function' };
           const res = await withTimeout<unknown>(

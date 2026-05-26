@@ -1,8 +1,9 @@
 import { Song, LyricLine } from '../types';
 
 class ApiServer {
-  async search(query: string): Promise<Song[]> {
-    const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+  async search(query: string, sources?: string[]): Promise<Song[]> {
+    const sParam = sources && sources.length > 0 ? `&sources=${encodeURIComponent(sources.join(','))}` : '';
+    const res = await fetch(`/api/search?q=${encodeURIComponent(query)}${sParam}`);
     if (!res.ok) throw new Error('Search request failed');
     const data = await res.json();
     
@@ -33,9 +34,10 @@ class ApiServer {
     return formattedResults;
   }
 
-  searchStream(query: string, type: string, onData: (results: unknown[]) => void, signal?: AbortSignal): Promise<void> {
+  searchStream(query: string, type: string, onData: (results: unknown[]) => void, signal?: AbortSignal, sources?: string[]): Promise<void> {
     return new Promise((resolve, reject) => {
-      const eventSource = new EventSource(`/api/search/stream?q=${encodeURIComponent(query)}&type=${encodeURIComponent(type)}`);
+      const sParam = sources && sources.length > 0 ? `&sources=${encodeURIComponent(sources.join(','))}` : '';
+      const eventSource = new EventSource(`/api/search/stream?q=${encodeURIComponent(query)}&type=${encodeURIComponent(type)}${sParam}`);
       
       if (signal) {
         signal.addEventListener('abort', () => {

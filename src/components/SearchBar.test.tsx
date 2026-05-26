@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SearchBar } from './SearchBar';
 
 describe('SearchBar', () => {
@@ -10,8 +11,17 @@ describe('SearchBar', () => {
   it('renders correctly', () => {
     const setSearchQuery = vi.fn();
     const onSearch = vi.fn();
+    const onToggleSource = vi.fn();
     
-    render(<SearchBar searchQuery="" setSearchQuery={setSearchQuery} onSearch={onSearch} />);
+    render(
+      <SearchBar 
+        searchQuery="" 
+        setSearchQuery={setSearchQuery} 
+        onSearch={onSearch} 
+        selectedSources={['xiaoqiu', 'xiaowo']}
+        onToggleSource={onToggleSource}
+      />
+    );
     expect(screen.getByPlaceholderText('搜索音乐、歌手、歌词...')).toBeInTheDocument();
   });
 
@@ -20,8 +30,17 @@ describe('SearchBar', () => {
     
     const setSearchQuery = vi.fn();
     const onSearch = vi.fn();
+    const onToggleSource = vi.fn();
     
-    const { rerender } = render(<SearchBar searchQuery="" setSearchQuery={setSearchQuery} onSearch={onSearch} />);
+    const { rerender } = render(
+      <SearchBar 
+        searchQuery="" 
+        setSearchQuery={setSearchQuery} 
+        onSearch={onSearch} 
+        selectedSources={['xiaoqiu']}
+        onToggleSource={onToggleSource}
+      />
+    );
     
     const input = screen.getByPlaceholderText('搜索音乐、歌手、歌词...');
     fireEvent.focus(input);
@@ -30,7 +49,15 @@ describe('SearchBar', () => {
     expect(screen.getByText('周杰伦')).toBeInTheDocument();
     
     // type a prefix
-    rerender(<SearchBar searchQuery="周" setSearchQuery={setSearchQuery} onSearch={onSearch} />);
+    rerender(
+      <SearchBar 
+        searchQuery="周" 
+        setSearchQuery={setSearchQuery} 
+        onSearch={onSearch} 
+        selectedSources={['xiaoqiu']}
+        onToggleSource={onToggleSource}
+      />
+    );
     
     // should filter history and show '周杰伦' and '周传雄'
     expect(screen.getByText('周杰伦')).toBeInTheDocument();
@@ -44,8 +71,17 @@ describe('SearchBar', () => {
     let currentQuery = '测';
     const setSearchQuery = vi.fn().mockImplementation((val) => { currentQuery = val; });
     const onSearch = vi.fn((e) => e?.preventDefault());
+    const onToggleSource = vi.fn();
     
-    render(<SearchBar searchQuery={currentQuery} setSearchQuery={setSearchQuery} onSearch={onSearch} />);
+    render(
+      <SearchBar 
+        searchQuery={currentQuery} 
+        setSearchQuery={setSearchQuery} 
+        onSearch={onSearch} 
+        selectedSources={['xiaoqiu']}
+        onToggleSource={onToggleSource}
+      />
+    );
     
     const input = screen.getByPlaceholderText('搜索音乐、歌手、歌词...');
     fireEvent.focus(input);
@@ -58,5 +94,34 @@ describe('SearchBar', () => {
     await waitFor(() => {
       expect(onSearch).toHaveBeenCalled();
     });
+  });
+
+  it('toggles sources configuration panel and toggles active platforms', () => {
+    const setSearchQuery = vi.fn();
+    const onSearch = vi.fn();
+    const onToggleSource = vi.fn();
+    
+    render(
+      <SearchBar 
+        searchQuery="" 
+        setSearchQuery={setSearchQuery} 
+        onSearch={onSearch} 
+        selectedSources={['xiaoqiu', 'xiaoyun']}
+        onToggleSource={onToggleSource}
+      />
+    );
+
+    // click trigger button
+    const trigger = screen.getByTitle('选择搜索平台');
+    fireEvent.click(trigger);
+
+    // should render settings panel titles
+    expect(screen.getByText('搜索音源平台')).toBeInTheDocument();
+
+    // toggle 小秋音乐
+    const platformLabelOption = screen.getByText('小秋音乐');
+    fireEvent.click(platformLabelOption);
+
+    expect(onToggleSource).toHaveBeenCalledWith('xiaoqiu');
   });
 });
