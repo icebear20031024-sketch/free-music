@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary-blue: #0071E3;
+  --color-primary-hover: #006EDB;
+  --color-primary-press: #0076DF;
+  --color-text-dom: #1D1D1F;
+  --color-text-sec: #333336;
+  --color-text-ter: #6E6E73;
+  --color-bg-main: #FFFFFF;
+  --color-surface-light: #EDEDF2;
+  --color-nav-surface: rgba(255, 255, 255, 0.8);
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-bg-main);
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+}
+
+input[type=range].player-volume-slider {
+  -webkit-appearance: none;
+  background: transparent;
+}
+
+input[type=range].player-volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 14px;
+  width: 14px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid rgba(0,0,0,0.1);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+input[type=range].player-volume-slider:hover::-webkit-slider-thumb {
+  opacity: 1;
+}
+
+input[type=range].player-volume-slider:active::-webkit-slider-thumb {
+  transform: scale(1.1);
+}
+
