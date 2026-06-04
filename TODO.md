@@ -27,7 +27,7 @@
 
 ### 阶段 4: 前端架构 TDD 重构
 - [x] 为核心组件 (比如 `PlayerProvider.tsx`, `LyricsView.tsx`, `SearchBar.tsx`) 编写单元/组件级测试。
-- [ ] 为 Hooks (`usePlaylists.ts`, `useDownloads.ts`) 编写业务逻辑测试。
+- [x] 为 Hooks (`usePlaylists.ts`, `useDownloads.ts`) 编写业务逻辑测试。
 - [ ] 规范前端目录树 (按功能或特性划分域，如 `src/features/`, `src/layouts/`) 以及抽取共享服务到 `src/services/`。
 
 ### 阶段 5: E2E 验证与交付
