@@ -445,19 +445,26 @@ const qualityLevels = {
     wav: "wav",
 };
 async function getMediaSource(musicItem, quality) {
-    const res = (
-        await axios_1.default.get(`https://lxmusicapi.onrender.com/url/tx/${musicItem.songmid}/${qualityLevels[quality]}`, {
-            headers: {
-                "X-Request-Key": "share-v3"
-            },
-        })
-    ).data;
-    if (!res || !res.url || (res.msg && res.msg !== "success") || res.url.includes("panspace.kuwo.cn")) {
-        throw new Error(res && res.msg ? res.msg : "无法获取播放链接");
+    try {
+        const res = (
+            await axios_1.default.get(`https://lxmusicapi.onrender.com/url/tx/${musicItem.songmid}/${qualityLevels[quality]}`, {
+                headers: {
+                    "X-Request-Key": "share-v3"
+                },
+            })
+        ).data;
+        if (!res || !res.url || (res.msg && res.msg !== "success") || res.url.includes("panspace.kuwo.cn")) {
+            throw new Error(res && res.msg ? res.msg : "无法获取播放链接");
+        }
+        return {
+            url: res.url,
+        };
+    } catch (err) {
+        if (process.env.NODE_ENV === 'test' || typeof globalThis.XMLHttpRequest !== 'undefined') {
+            throw err;
+        }
+        throw err;
     }
-    return {
-        url: res.url,
-    };
 }
 module.exports = {
     platform: "小秋音乐",

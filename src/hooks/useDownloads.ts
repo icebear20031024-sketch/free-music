@@ -37,8 +37,8 @@ export function useDownloads() {
     }
   };
 
-  const downloadSong = async (song: Song) => {
-    if (downloadingIds.has(song.id)) return;
+  const downloadSong = async (song: Song, quality?: string) => {
+    if (downloadingIds.has(song.id)) return false;
     
     setDownloadingIds(prev => {
       const next = new Set(prev);
@@ -47,10 +47,8 @@ export function useDownloads() {
     });
 
     try {
-      let url = song.url;
-      if (!url) {
-        url = await api.getMediaUrl(song);
-      }
+      // Always query a live URL matching the target quality description
+      const url = await api.getMediaUrl(song, quality);
       if (!url) throw new Error('No URL found');
 
       // Fetch lyrics
@@ -87,7 +85,23 @@ export function useDownloads() {
         }
       }
       
-      const blob = new Blob(chunks, { type: response.headers.get('content-type') || 'audio/mpeg' });
+      const contentType = response.headers.get('content-type') || '';
+      let extension = 'mp3';
+      const q = quality || localStorage.getItem('music_audio_quality') || 'standard';
+      
+      if (contentType.includes('flac')) {
+        extension = 'flac';
+      } else if (contentType.includes('wav')) {
+        extension = 'wav';
+      } else if (contentType.includes('m4a') || contentType.includes('x-m4a') || contentType.includes('mp4')) {
+        extension = 'm4a';
+      } else if (q === 'flac') {
+        extension = 'flac';
+      } else if (q === 'wav') {
+        extension = 'wav';
+      }
+      
+      const blob = new Blob(chunks, { type: contentType || 'audio/mpeg' });
       
       // Trigger actual browser download to user's file system
       const objectUrl = URL.createObjectURL(blob);
@@ -95,7 +109,7 @@ export function useDownloads() {
       a.href = objectUrl;
       const safeTitle = (song.title || 'Unknown').replace(/[<>:"/\\|?*]/g, '');
       const safeArtist = (song.artist || 'Unknown').replace(/[<>:"/\\|?*]/g, '');
-      a.download = `${safeArtist} - ${safeTitle}.mp3`;
+      a.download = `${safeArtist} - ${safeTitle}.${extension}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -108,9 +122,10 @@ export function useDownloads() {
       await db.setItem(`song_lyric_${song.id}`, lyrics);
       
       await loadDownloads();
+      return true;
     } catch (e: unknown) {
       console.error('Download failed:', e);
-      alert('下载失败: ' + (e instanceof Error ? e.message : String(e)));
+      throw e;
     } finally {
       setDownloadingIds(prev => {
         const next = new Set(prev);

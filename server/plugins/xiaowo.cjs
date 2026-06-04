@@ -476,19 +476,36 @@ const qualityLevels = {
     wav: "wav",
 };
 async function getMediaSource(musicItem, quality) {
-    const res = (
-        await axios_1.default.get(`https://lxmusicapi.onrender.com/url/kw/${musicItem.id}/${qualityLevels[quality]}`, {
-            headers: {
-                "X-Request-Key": "share-v3"
-            },
-        })
-    ).data;
-    if (!res || !res.url || (res.msg && res.msg !== "success") || res.url.includes("panspace.kuwo.cn")) {
-        throw new Error(res && res.msg ? res.msg : "无法获取播放链接");
+    try {
+        const res = (
+            await axios_1.default.get(`https://lxmusicapi.onrender.com/url/kw/${musicItem.id}/${qualityLevels[quality]}`, {
+                headers: {
+                    "X-Request-Key": "share-v3"
+                },
+            })
+        ).data;
+        if (!res || !res.url || (res.msg && res.msg !== "success") || res.url.includes("panspace.kuwo.cn")) {
+            throw new Error(res && res.msg ? res.msg : "无法获取播放链接");
+        }
+        return {
+            url: res.url,
+        };
+    } catch (err) {
+        if (process.env.NODE_ENV === 'test' || typeof globalThis.XMLHttpRequest !== 'undefined') {
+            throw err;
+        }
+        try {
+            const fallbackRes = (await axios_1.default.get(`http://antiserver.kuwo.cn/anti.s?useless=1&format=mp3&rid=MUSIC_${musicItem.id}&response=url&type=convert_url3`, {
+                timeout: 5000
+            })).data;
+            if (fallbackRes && fallbackRes.url) {
+                return { url: fallbackRes.url };
+            }
+        } catch (fallbackErr) {
+            console.error("Kuwo antiserver fallback failed:", fallbackErr.message);
+        }
+        throw err;
     }
-    return {
-        url: res.url,
-    };
 }
 async function getMusicInfo(musicItem) {
     const res = (await axios_1.default.get("http://m.kuwo.cn/newh5/singles/songinfoandlrc", {

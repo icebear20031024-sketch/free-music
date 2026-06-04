@@ -89,7 +89,7 @@ export function Sidebar({ currentView, setView, playlists, createPlaylist, remov
   };
 
   return (
-    <aside className="w-64 bg-[#F5F5F7] border-r border-[#EDEDF2] flex flex-col p-6 hidden md:flex z-20 shrink-0 h-full overflow-y-auto">
+    <aside className="w-64 bg-[#F5F5F7] border-r border-[#EDEDF2] flex flex-col px-6 pt-6 pb-[104px] hidden md:flex z-20 shrink-0 h-full overflow-y-auto">
       <div className="flex items-center gap-2 mb-10 text-[#0071E3] cursor-pointer" onClick={() => setView('search')}>
         <Music className="w-8 h-8" />
         <h1 className="text-[24px] font-[600] tracking-tight text-[#1D1D1F]">Music</h1>
@@ -174,12 +174,13 @@ export function Sidebar({ currentView, setView, playlists, createPlaylist, remov
         </div>
       </nav>
 
-      <div className="mt-auto pt-6 border-t border-[#EDEDF2] flex flex-col gap-3">
-        <div className="flex items-center gap-2 text-[#6E6E73] px-1">
-          <Settings className="w-4 h-4" />
+      <div className="mt-auto pt-6 border-t border-[#EDEDF2] flex flex-col gap-2">
+        <label htmlFor="audio-quality-select" className="flex items-center gap-2 text-[#6E6E73] px-1 cursor-pointer hover:text-[#0071E3] transition-colors select-none">
+          <Settings className="w-4 h-4 animate-[spin_8s_linear_infinite]" />
           <span className="text-[13px] font-[600] uppercase tracking-wider">音质选择</span>
-        </div>
+        </label>
         <select 
+          id="audio-quality-select"
           value={audioQuality} 
           onChange={handleQualityChange}
           className="w-full bg-white border border-[#D5D5D7] rounded-[8px] px-3 py-2 text-[14px] text-[#1D1D1F] focus:outline-none focus:border-[#0071E3] focus:ring-[3px] focus:ring-[#0071E3]/10 cursor-pointer appearance-none bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiMzMzMzMzYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cG9seWxpbmUgcG9pbnRzPSI2IDkgMTIgMTUgMTggOSI+PC9wb2x5bGluZT48L3N2Zz4=')] bg-no-repeat bg-[position:right_12px_center] bg-[length:16px_16px] pr-8"

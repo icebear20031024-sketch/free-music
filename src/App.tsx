@@ -30,6 +30,19 @@ function MainContent({ currentView, setView, playlists, createPlaylist, removePl
   const [errorString, setErrorString] = useState<string | null>(null);
   const searchAbortController = useRef<AbortController | null>(null);
 
+  const [toast, setToast] = useState<{ message: string; actionText?: string; onAction?: () => void } | null>(null);
+  const [activeDownloadMenuId, setActiveDownloadMenuId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleDocumentClick = () => {
+      setActiveDownloadMenuId(null);
+    };
+    document.addEventListener('click', handleDocumentClick);
+    return () => {
+      document.removeEventListener('click', handleDocumentClick);
+    };
+  }, []);
+
   const [selectedSources, setSelectedSources] = useState<string[]>(() => {
     const saved = localStorage.getItem('search_sources');
     if (saved) {
@@ -59,6 +72,36 @@ function MainContent({ currentView, setView, playlists, createPlaylist, removePl
 
   const { playSong, currentSong, playlist } = usePlayer();
   const { downloads, downloadSong, removeDownload, isDownloaded, isDownloading, downloadProgress } = useDownloads();
+
+  const handleDownload = async (song: Song, quality?: string) => {
+    try {
+      const q = quality || localStorage.getItem('music_audio_quality') || 'standard';
+      const success = await downloadSong(song, q);
+      if (success) {
+        const qualityLabel = 
+          q === 'flac' ? ' (无损FLAC)' :
+          q === 'wav' ? ' (原音轨WAV)' :
+          q === 'standard' ? ' (较高320k)' :
+          q === 'low' ? ' (标准128k)' : ' (极速标准)';
+        setToast({
+          message: `已成功保存《${song.title}》${qualityLabel}，可在“本地下载”中查看`,
+          actionText: '去查看',
+          onAction: () => setView('downloads')
+        });
+        setTimeout(() => {
+          setToast(curr => curr?.message.includes(song.title) ? null : curr);
+        }, 6000);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setToast({
+        message: `下载失败: ${err.message || String(err)}`
+      });
+      setTimeout(() => {
+        setToast(curr => curr?.message.includes('下载失败:') ? null : curr);
+      }, 5000);
+    }
+  };
 
   const handleSearch = async (e?: React.FormEvent, overrideType?: string, overrideQuery?: string) => {
     e?.preventDefault();
@@ -456,9 +499,14 @@ function MainContent({ currentView, setView, playlists, createPlaylist, removePl
                       <div className="w-16 text-right text-[13px] leading-[20px] text-[#6E6E73] font-mono cursor-pointer" onClick={() => playSong(song, sortedSongs)}>
                         {formatDuration(song.duration)}
                       </div>
-                      <div className="w-24 flex items-center justify-end gap-3 text-[#6E6E73] shrink-0">
+                      <div className="w-24 flex items-center justify-end gap-3 text-[#6E6E73] shrink-0 relative">
                         {currentPl && currentPl.id !== 'default' && (
-                            <button className="hover:text-[#e30000] p-2 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100" onClick={() => removeFromPlaylist(currentPl.id, song.id)} title="从歌单移出">
+                            <button className="hover:text-[#e30000] p-2 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100" onClick={(e) => { e.stopPropagation(); removeFromPlaylist(currentPl.id, song.id); }} title="从歌单移出">
+                                <Trash2 className="w-[18px] h-[18px]" />
+                            </button>
+                        )}
+                        {currentView === 'downloads' && (
+                            <button className="hover:text-[#e30000] p-2 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100" onClick={(e) => { e.stopPropagation(); removeDownload(song.id); }} title="删除本地下载">
                                 <Trash2 className="w-[18px] h-[18px]" />
                             </button>
                         )}
@@ -470,23 +518,75 @@ function MainContent({ currentView, setView, playlists, createPlaylist, removePl
                             <div className="w-4 h-4 border-[2px] border-[#0071E3]/30 border-t-[#0071E3] rounded-full animate-spin"></div>
                           </div>
                         ) : isDownloaded(song.id) ? (
-                          <>
-                            <CheckCircle className="w-5 h-5 text-[#0071E3]" />
-                          </>
+                          <div className="relative group/dl flex items-center justify-end">
+                            <button 
+                              className="text-[#0071E3] p-2 transition-all hover:scale-105"
+                              onClick={(e) => { 
+                                e.stopPropagation(); 
+                                setActiveDownloadMenuId(activeDownloadMenuId === song.id ? null : song.id); 
+                              }}
+                              title="已下载。点击选择品质重新下载"
+                            >
+                              <CheckCircle className="w-[20px] h-[20px] block group-hover/dl:hidden" />
+                              <Download className="w-[20px] h-[20px] hidden group-hover/dl:block text-[#0071E3]" />
+                            </button>
+                          </div>
                         ) : (
                           <button 
-                            className="hover:text-[#0071E3] transition-colors p-2"
-                            onClick={(e) => { e.stopPropagation(); downloadSong(song); }}
-                            title="下载"
+                            className="hover:text-[#0071E3] transition-all p-2 hover:scale-105"
+                            onClick={(e) => { 
+                              e.stopPropagation(); 
+                              setActiveDownloadMenuId(activeDownloadMenuId === song.id ? null : song.id); 
+                            }}
+                            title="选择品质并下载"
                           >
                             <Download className="w-[20px] h-[20px]" />
                           </button>
+                        )}
+
+                        {activeDownloadMenuId === song.id && (
+                          <div 
+                            className="absolute right-0 top-full mt-1 bg-white border border-[#EDEDF2] rounded-[12px] shadow-[0_8px_32px_rgba(0,0,0,0.15)] p-1.5 z-40 w-[180px] flex flex-col gap-0.5 text-[13px] text-left"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="px-2 py-1 text-[11px] font-[600] text-[#8E8E93] border-b border-[#EDEDF2] mb-1 select-none">
+                              选择下载音质
+                            </div>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); handleDownload(song, 'low'); setActiveDownloadMenuId(null); }}
+                              className="w-full px-2 py-1.5 hover:bg-[#F5F5F7] hover:text-[#0071E3] rounded-[6px] text-left transition-colors flex items-center justify-between font-normal text-[#1D1D1F]"
+                            >
+                              <span>极速标准 (128k)</span>
+                              <span className="text-[9px] bg-black/5 px-1 py-0.5 rounded text-[#6E6E73] font-[600]">MP3</span>
+                            </button>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); handleDownload(song, 'standard'); setActiveDownloadMenuId(null); }}
+                              className="w-full px-2 py-1.5 hover:bg-[#F5F5F7] hover:text-[#0071E3] rounded-[6px] text-left transition-colors flex items-center justify-between font-normal text-[#1D1D1F]"
+                            >
+                              <span>高品质 (320k)</span>
+                              <span className="text-[9px] bg-black/5 px-1 py-0.5 rounded text-[#6E6E73] font-[600]">MP3</span>
+                            </button>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); handleDownload(song, 'flac'); setActiveDownloadMenuId(null); }}
+                              className="w-full px-2 py-1.5 hover:bg-[#F5F5F7] hover:text-[#0071E3] rounded-[6px] text-left transition-colors flex items-center justify-between font-normal text-[#1D1D1F]"
+                            >
+                              <span>极高无损 (FLAC)</span>
+                              <span className="text-[9px] bg-blue-50 text-[#0071E3] px-1 py-0.5 rounded font-[700]">FLAC</span>
+                            </button>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); handleDownload(song, 'wav'); setActiveDownloadMenuId(null); }}
+                              className="w-full px-2 py-1.5 hover:bg-[#F5F5F7] hover:text-[#0071E3] rounded-[6px] text-left transition-colors flex items-center justify-between font-normal text-[#1D1D1F]"
+                            >
+                              <span>母带原轨 (WAV)</span>
+                              <span className="text-[9px] bg-amber-50 text-amber-700 px-1 py-0.5 rounded font-[700]">WAV</span>
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
                   ))}
                 </div>
-             </>
+              </>
             )}
           </div>
         ) : (
@@ -498,6 +598,29 @@ function MainContent({ currentView, setView, playlists, createPlaylist, removePl
            </div>
         )}
       </div>
+
+      {toast && (
+        <div className="fixed bottom-24 right-8 z-[100] flex items-center gap-3 bg-white/95 border border-[#EDEDF2] text-[#1D1D1F] px-4 py-3 rounded-[12px] shadow-[0_8px_32px_rgba(0,0,0,0.12)] max-w-sm sm:max-w-md transition-all duration-300">
+          <div className="w-2.5 h-2.5 rounded-full bg-[#0071E3] animate-pulse"></div>
+          <div className="flex-1 text-[14px] leading-[20px] font-semibold text-[#1D1D1F] truncate pr-4">
+            {toast.message}
+          </div>
+          {toast.actionText && toast.onAction && (
+            <button 
+              onClick={() => { toast.onAction?.(); setToast(null); }}
+              className="text-[#0071E3] hover:text-[#0051A3] text-[14px] font-[600] shrink-0 mr-2 hover:underline cursor-pointer"
+            >
+              {toast.actionText}
+            </button>
+          )}
+          <button 
+            onClick={() => setToast(null)}
+            className="text-[#8E8E93] hover:text-[#1D1D1F] text-[13px] font-[500] shrink-0 ml-1 pl-2 border-l border-[#EDEDF2] cursor-pointer"
+          >
+            关闭
+          </button>
+        </div>
+      )}
     </main>
   );
 }
