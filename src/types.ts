@@ -21,6 +21,7 @@ export interface Song<TRaw = unknown> {
 export interface LyricLine {
   time: number;
   text: string;
+  translation?: string;
 }
 
 export interface ApiSearchResult<TData = unknown> {

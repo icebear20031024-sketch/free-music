@@ -214,4 +214,185 @@ export function setupRoutes(app: Express) {
       next(error);
     }
   });
+
+  app.get('/api/download', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const sourceId = req.query.sourceId as string;
+      const quality = (req.query.quality as string) || 'standard';
+      let filename = req.query.filename as string;
+      
+      if (!sourceId) {
+        return res.status(400).json({ success: false, error: 'Missing sourceId' });
+      }
+
+      let musicItem: any = null;
+      const musicItemRaw = req.query.musicItem as string;
+      if (musicItemRaw) {
+        try {
+          musicItem = JSON.parse(musicItemRaw);
+        } catch (e) {
+          return res.status(400).json({ success: false, error: 'Invalid JSON in musicItem parameter' });
+        }
+      } else {
+        const id = req.query.id as string;
+        if (!id) {
+          return res.status(400).json({ success: false, error: 'Missing musicItem or music id' });
+        }
+        musicItem = {
+          id,
+          songId: id,
+          mid: id,
+          copyrightId: id,
+          title: req.query.title as string || '',
+          artist: req.query.artist as string || '',
+          album: req.query.album as string || '',
+        };
+      }
+
+      const plugin = pluginManager.getPlugin(sourceId);
+      if (!plugin) {
+        return res.status(404).json({ success: false, error: 'Plugin not found' });
+      }
+      if (!plugin.getMediaSource) {
+        return res.status(400).json({ success: false, error: 'Plugin does not support music retrieval' });
+      }
+
+      const mediaRes = await withTimeout<{ url?: string; header?: Record<string, string> }>(
+        plugin.getMediaSource(musicItem, quality),
+        10000,
+        'Fetch media source timeout'
+      );
+
+      if (!mediaRes || !mediaRes.url) {
+        return res.status(404).json({ success: false, error: 'Audio source URL not found' });
+      }
+
+      const targetUrl = mediaRes.url;
+      const pluginHeaders = mediaRes.header || {};
+
+      // Prepare download filename
+      if (!filename) {
+        const title = musicItem.title || musicItem.name || musicItem.songName || '';
+        const artist = musicItem.artist || musicItem.singer || '';
+        if (title && artist) {
+          filename = `${artist} - ${title}.mp3`;
+        } else if (title) {
+          filename = `${title}.mp3`;
+        } else {
+          filename = `${sourceId}_${musicItem.id || 'audio'}.mp3`;
+        }
+      } else if (!filename.includes('.')) {
+        filename = `${filename}.mp3`;
+      }
+
+      const headers: Record<string, string> = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+        'Referer': new URL(targetUrl).origin,
+        ...pluginHeaders
+      };
+
+      const response = await fetch(targetUrl, { headers });
+      if (!response.ok) {
+        return res.status(response.status || 500).json({ success: false, error: `Failed to fetch audio stream: ${response.statusText}` });
+      }
+
+      res.status(response.status || 200);
+      
+      const remoteType = response.headers.get('content-type') || 'audio/mpeg';
+      const remoteLength = response.headers.get('content-length');
+
+      res.setHeader('Content-Type', remoteType);
+      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
+      
+      if (remoteLength) {
+        res.setHeader('Content-Length', remoteLength);
+      }
+
+      if (response.body) {
+        Readable.fromWeb(response.body as import('stream/web').ReadableStream<Uint8Array>).pipe(res);
+      } else {
+        res.end();
+      }
+    } catch (error: any) {
+      next(error);
+    }
+  });
+
+  app.post('/api/download', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { sourceId, musicItem, quality, filename: bodyFilename } = req.body;
+      const requestedQuality = quality || 'standard';
+      
+      if (!sourceId || !musicItem) {
+        return res.status(400).json({ success: false, error: 'Missing sourceId or musicItem' });
+      }
+
+      const plugin = pluginManager.getPlugin(sourceId);
+      if (!plugin) {
+        return res.status(404).json({ success: false, error: 'Plugin not found' });
+      }
+      if (!plugin.getMediaSource) {
+        return res.status(400).json({ success: false, error: 'Plugin does not support music retrieval' });
+      }
+
+      const mediaRes = await withTimeout<{ url?: string; header?: Record<string, string> }>(
+        plugin.getMediaSource(musicItem, requestedQuality),
+        10000,
+        'Fetch media source timeout'
+      );
+
+      if (!mediaRes || !mediaRes.url) {
+        return res.status(404).json({ success: false, error: 'Audio source URL not found' });
+      }
+
+      const targetUrl = mediaRes.url;
+      const pluginHeaders = mediaRes.header || {};
+
+      let filename = bodyFilename;
+      if (!filename) {
+        const title = musicItem.title || musicItem.name || musicItem.songName || '';
+        const artist = musicItem.artist || musicItem.singer || '';
+        if (title && artist) {
+          filename = `${artist} - ${title}.mp3`;
+        } else if (title) {
+          filename = `${title}.mp3`;
+        } else {
+          filename = `${sourceId}_${musicItem.id || 'audio'}.mp3`;
+        }
+      } else if (!filename.includes('.')) {
+        filename = `${filename}.mp3`;
+      }
+
+      const headers: Record<string, string> = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+        'Referer': new URL(targetUrl).origin,
+        ...pluginHeaders
+      };
+
+      const response = await fetch(targetUrl, { headers });
+      if (!response.ok) {
+        return res.status(response.status || 500).json({ success: false, error: `Failed to fetch audio stream: ${response.statusText}` });
+      }
+
+      res.status(response.status || 200);
+      
+      const remoteType = response.headers.get('content-type') || 'audio/mpeg';
+      const remoteLength = response.headers.get('content-length');
+
+      res.setHeader('Content-Type', remoteType);
+      res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`);
+      
+      if (remoteLength) {
+        res.setHeader('Content-Length', remoteLength);
+      }
+
+      if (response.body) {
+        Readable.fromWeb(response.body as import('stream/web').ReadableStream<Uint8Array>).pipe(res);
+      } else {
+        res.end();
+      }
+    } catch (error: any) {
+      next(error);
+    }
+  });
 }

@@ -152,8 +152,27 @@ class ApiServer {
     
     if (lrcData.success) {
       const raw = lrcData.rawLrc || lrcData.lyric || lrcData.lrc || lrcData.lyrics;
+      const translationRaw = lrcData.translation || lrcData.tlyric;
       if (raw) {
-        return this.parseLyric(raw);
+        const lyricLines = this.parseLyric(raw);
+        if (translationRaw) {
+          const transLines = this.parseLyric(translationRaw);
+          lyricLines.forEach(line => {
+            let bestMatch: LyricLine | null = null;
+            let minDiff = 0.5; // max 500ms alignment window
+            for (const t of transLines) {
+              const diff = Math.abs(t.time - line.time);
+              if (diff < minDiff) {
+                minDiff = diff;
+                bestMatch = t;
+              }
+            }
+            if (bestMatch) {
+              line.translation = bestMatch.text;
+            }
+          });
+        }
+        return lyricLines;
       }
     }
     return [];

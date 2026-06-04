@@ -77,15 +77,29 @@ export function LyricsView() {
           <div className="py-[30vh]">
             {lyrics.length > 0 ? (
               lyrics.map((line, idx) => (
-                <p 
+                <div 
                   key={idx} 
-                  className={`text-center py-2 transition-all duration-300 ${
-                    idx === currentLyricIndex ? 'text-[#1D1D1F] text-[24px] font-[700] scale-110 drop-shadow-sm' : 'text-[#6E6E73] text-[20px] font-[600] opacity-50 hover:opacity-80'
+                  className={`text-center py-2.5 px-6 transition-all duration-300 flex flex-col gap-1 justify-center items-center ${
+                    idx === currentLyricIndex 
+                      ? 'text-[#1D1D1F] scale-105 origin-center' 
+                      : 'text-[#6E6E73] opacity-50 hover:opacity-80'
                   }`}
-                  style={{ minHeight: '40px' }}
                 >
-                  {line.text}
-                </p>
+                  <p className={`transition-all duration-300 ${
+                    idx === currentLyricIndex ? 'text-[24px] font-[700] drop-shadow-sm' : 'text-[20px] font-[600]'
+                  }`}>
+                    {line.text}
+                  </p>
+                  {line.translation && (
+                    <p className={`transition-all duration-300 ${
+                      idx === currentLyricIndex 
+                        ? 'text-[#0071E3] text-[18px] font-[600] mt-1' 
+                        : 'text-[#86868B] text-[15px] font-[500] mt-0.5'
+                    }`}>
+                      {line.translation}
+                    </p>
+                  )}
+                </div>
               ))
             ) : (
               <div className="flex flex-col items-center justify-center h-full gap-4 text-[#6E6E73] opacity-80 animate-pulse">

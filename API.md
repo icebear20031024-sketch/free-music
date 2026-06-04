@@ -145,6 +145,49 @@
 
 ---
 
+## 7. 完整版音源直接下载 `GET /api/download` & `POST /api/download`
+
+专门为下载完整音频文件而设计的流式代理接口。它支持重置自定义文件名并添加适当的 `Content-Disposition` 标头以在浏览器/下载工具中触发自动下载。
+
+### A. GET 方式接入 (最底层、最易集成的地基链接形式)
+
+极其易于在普通的 `<a href="...">`标签或 HTML/LLM 分析环境中直接点击或请求。
+
+**请求参数 (Query Parameters):**
+- `sourceId` (string, required): 音源插件ID，如 `xiaoyun`, `xiaoqiu`, `xiaogou`, `xiaowo`, `xiaomi`
+- `musicItem` (string, optional): 经过 URL 编码的、原始 JSON 格式字符串。
+- `id` (string, optional): 若未传递完整的 `musicItem`，可直接传入歌曲 id 进行快速直接下载。
+- `title` (string, optional): 配合传了 id 时的歌曲标题，用于自动生成文件名。
+- `artist` (string, optional): 配合传了 id 时的歌手名称，用于自动生成文件名。
+- `quality` (string, optional): 音质选择 (`low`, `standard`, `flac`, `wav`)，默认为 `standard`。
+- `filename` (string, optional): 指定下载后的本地文件名 (可选，不带或带有 `.mp3` 扩展名均可)。
+
+**请求示例:**
+- **包含完整 musicItem:**
+  `GET http://localhost:3000/api/download?sourceId=xiaoyun&quality=flac&musicItem=%7B%22id%22%3A%22123%22%2C%22title%22%3A%22%E6%99%B4%E5%A4%A9%22%2C%22artist%22%3A%22%E5%91%A8%E6%9D%B0%E4%BC%A6%22%7D`
+- **简易快捷请求 (只需参数拼接):**
+  `GET http://localhost:3000/api/download?sourceId=xiaoyun&id=123&title=晴天&artist=周杰伦&quality=standard`
+
+### B. POST 方式接入 (高安全性、高并发无缝数据集成)
+
+专为完整歌曲实体数据直接集成而设计，能完全杜绝 URL 长度限制或字符转义问题。
+
+**请求头部:**
+- `Content-Type: application/json`
+
+**请求体参数 (JSON Body):**
+- `sourceId` (string, required): 音源插件ID
+- `musicItem` (object, required): 插件或歌曲结果中包含的 `raw` 原始数据实体。
+- `quality` (string, optional): 选择音质
+- `filename` (string, optional): 自定义下载文件名
+
+**响应头部与流输出:**
+- `Content-Type`: 原生音轨类型 (如 `audio/mpeg` 或音频服务响应的实际数据格式)。
+- `Content-Disposition`: `attachment; filename*=UTF-8''[文件名]` (触发立即下载)。
+- `Content-Length`: 目标文件的总字节长 (可选)。
+
+---
+
 ## 未来扩展: LLM 音乐画像分析
 
 基于前面列举的数据捕获接口，推荐在后续开发时由后端集成 LLM 对用户创建好的音乐实体进行二次加工：

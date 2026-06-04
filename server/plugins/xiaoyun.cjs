@@ -247,7 +247,8 @@ async function getLyric(musicItem) {
         data: paeData,
     })).data;
     return {
-        rawLrc: result.lrc.lyric,
+        rawLrc: result.lrc && result.lrc.lyric ? result.lrc.lyric : "",
+        translation: result.tlyric && result.tlyric.lyric ? result.tlyric.lyric : undefined,
     };
 }
 async function getMusicInfo(musicItem) {
