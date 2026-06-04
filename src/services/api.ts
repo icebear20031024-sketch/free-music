@@ -3,8 +3,12 @@ import { Song, LyricLine } from '../types';
 export function getProxiedCoverUrl(url: string | undefined): string {
   const fallback = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&q=80';
   if (!url) return fallback;
-  const strUrl = String(url).trim();
+  let strUrl = String(url).trim();
   if (!strUrl) return fallback;
+  
+  if (strUrl.startsWith('//')) {
+    strUrl = 'https:' + strUrl;
+  }
   
   if (strUrl.startsWith('http://') || strUrl.startsWith('https://')) {
     if (strUrl.includes('/api/proxy?url=')) return strUrl;

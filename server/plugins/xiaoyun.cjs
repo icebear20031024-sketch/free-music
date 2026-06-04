@@ -52,7 +52,16 @@ function formatMusicItem(_) {
     const album = _.al || _.album;
     return {
         id: _.id,
-        artwork: album === null || album === void 0 ? void 0 : album.picUrl,
+        artwork: (() => {
+            let picUrl = album === null || album === void 0 ? void 0 : album.picUrl;
+            if (!picUrl && album) {
+                const picId = album.picId_str || album.picId || album.pic;
+                if (picId && picId !== "0" && picId !== 0 && picId !== "null" && picId !== "undefined") {
+                    picUrl = `https://music.163.com/api/img/system/get?id=${picId}`;
+                }
+            }
+            return picUrl;
+        })(),
         title: _.name,
         artist: (_.ar || _.artists)[0].name,
         album: album === null || album === void 0 ? void 0 : album.name,
@@ -172,7 +181,17 @@ async function searchLyric(query, page) {
             title: it.name,
             artist: (_a = it.ar) === null || _a === void 0 ? void 0 : _a.map((_) => _.name).join(", "),
             id: it.id,
-            artwork: (_b = it.al) === null || _b === void 0 ? void 0 : _b.picUrl,
+            artwork: (() => {
+                const al = it.al || {};
+                let pUrl = al.picUrl;
+                if (!pUrl) {
+                    const picId = al.picId_str || al.picId || al.pic;
+                    if (picId && picId !== "0" && picId !== 0 && picId !== "null" && picId !== "undefined") {
+                        pUrl = `https://music.163.com/api/img/system/get?id=${picId}`;
+                    }
+                }
+                return pUrl;
+            })(),
             album: (_c = it.al) === null || _c === void 0 ? void 0 : _c.name,
             rawLrcTxt: (_d = it.lyrics) === null || _d === void 0 ? void 0 : _d.join("\n"),
         });

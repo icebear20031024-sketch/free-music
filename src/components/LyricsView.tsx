@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { usePlayer } from './PlayerProvider';
+import { getProxiedCoverUrl } from '../services/api';
+import { CoverImage } from './CoverImage';
 
 export function LyricsView() {
   const { currentSong, isPlaying, currentTime, lyrics, showLyricsView, setShowLyricsView } = usePlayer();
@@ -56,14 +58,10 @@ export function LyricsView() {
         {/* Record player visual area */}
         <div className="flex-1 flex flex-col items-center justify-center max-w-sm">
           <div className={`relative w-80 h-80 rounded-[16px] bg-[#EDEDF2] flex items-center justify-center shadow-lg transition-transform duration-[20s] linear ${isPlaying ? 'scale-105' : 'scale-100'} overflow-hidden border border-black/5`}>
-            <img 
-              src={currentSong.cover} 
+            <CoverImage 
+              src={getProxiedCoverUrl(currentSong.cover)} 
               alt={currentSong.title} 
               className="w-full h-full object-cover" 
-              referrerPolicy="no-referrer"
-              onError={(e) => {
-                e.currentTarget.src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80';
-              }}
             />
           </div>
           <div className="mt-8 text-center">

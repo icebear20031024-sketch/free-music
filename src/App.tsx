@@ -3,6 +3,7 @@ import { Sidebar } from './components/Sidebar';
 import { SearchBar } from './components/SearchBar';
 import { PlayerBar } from './components/PlayerBar';
 import { LyricsView } from './components/LyricsView';
+import { CoverImage } from './components/CoverImage';
 import { PlayerProvider, usePlayer } from './components/PlayerProvider';
 import { usePlaylists } from './hooks/usePlaylists';
 import { useDownloads } from './hooks/useDownloads';
@@ -408,21 +409,27 @@ function MainContent({ currentView, setView, playlists, createPlaylist, removePl
                         {currentSong?.id === song.id ? <div className="text-[#0071E3] text-[12px]">▶</div> : i + 1}
                       </div>
                       <div className="flex-1 min-w-0 flex items-center gap-4 cursor-pointer" onClick={() => playSong(song, sortedSongs)}>
-                        <img 
-                          src={song.cover || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=80&q=80'} 
+                        <CoverImage 
+                          src={getProxiedCoverUrl(song.cover)} 
                           alt={song.title} 
-                          referrerPolicy="no-referrer"
-                          onError={(e) => {
-                            e.currentTarget.src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=80&q=80';
-                          }}
-                          className="w-11 h-11 object-cover flex-shrink-0 bg-[#EDEDF2] border border-[#rgba(0,0,0,0.05)] shadow-sm"
+                          className="w-11 h-11 rounded-[6px] flex-shrink-0 bg-[#EDEDF2] border border-black/5 shadow-sm"
                         />
                         <div className="flex-1 min-w-0 flex flex-col justify-center">
                           <p className={`font-[600] truncate text-[17px] leading-[25px] ${currentSong?.id === song.id ? 'text-[#0071E3]' : 'text-[#1D1D1F]'}`}>{song.title}</p>
                           <p className="text-[12px] leading-[16px] text-[#6E6E73] sm:hidden truncate">{song.artist} - {song.album}</p>
                         </div>
                       </div>
-                      <div className="w-1/4 text-[17px] leading-[25px] text-[#333336] truncate hidden sm:block cursor-pointer font-[400]" onClick={() => playSong(song, sortedSongs)}>
+                      <div 
+                        className="w-1/4 text-[17px] leading-[25px] text-[#333336] truncate hidden sm:block cursor-pointer font-[400] hover:text-[#0071E3] hover:underline" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (song.artist && song.artist !== 'Unknown') {
+                            setSearchQuery(song.artist);
+                            handleSearch(undefined, 'artist', song.artist);
+                          }
+                        }}
+                        title={song.artist && song.artist !== 'Unknown' ? `快捷筛选/搜索歌手 "${song.artist}"` : undefined}
+                      >
                         {song.artist}
                       </div>
 
@@ -431,7 +438,17 @@ function MainContent({ currentView, setView, playlists, createPlaylist, removePl
                           {formatDate((song as Record<string, unknown>).downloadedAt as number | string)}
                         </div>
                       ) : (
-                        <div className="w-1/4 text-[17px] leading-[25px] text-[#333336] truncate hidden sm:block cursor-pointer font-[400]" onClick={() => playSong(song, sortedSongs)}>
+                        <div 
+                          className="w-1/4 text-[17px] leading-[25px] text-[#333336] truncate hidden sm:block cursor-pointer font-[400] hover:text-[#0071E3] hover:underline" 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (song.album && song.album !== 'Unknown') {
+                              setSearchQuery(song.album);
+                              handleSearch(undefined, 'album', song.album);
+                            }
+                          }}
+                          title={song.album && song.album !== 'Unknown' ? `快捷筛选/搜索专辑 "${song.album}"` : undefined}
+                        >
                           {song.album}
                         </div>
                       )}

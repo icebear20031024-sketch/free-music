@@ -167,21 +167,36 @@ export function setupRoutes(app: Express) {
 
   app.get('/api/proxy', async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const targetUrl = req.query.url as string;
+      let targetUrl = req.query.url as string;
       if (!targetUrl) {
         return res.status(400).json({ error: 'Missing url parameter' });
       }
 
+      targetUrl = targetUrl.trim();
+      let normalizedUrl = targetUrl;
+      if (targetUrl.startsWith('//')) {
+        normalizedUrl = 'https:' + targetUrl;
+      } else if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+        normalizedUrl = 'https://' + targetUrl;
+      }
+
+      let refererValue = 'https://music.163.com';
+      try {
+        refererValue = new URL(normalizedUrl).origin;
+      } catch (e) {
+        // Fallback or leave as default
+      }
+
       const headers: Record<string, string> = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
-        'Referer': new URL(targetUrl).origin
+        'Referer': refererValue
       };
       
       if (req.headers.range) {
         headers['Range'] = req.headers.range;
       }
 
-      const response = await fetch(targetUrl, { headers });
+      const response = await fetch(normalizedUrl, { headers });
 
       if (!response.ok && response.status !== 206) {
         return res.status(response.status).json({ error: 'Proxy request failed: ' + response.statusText });
