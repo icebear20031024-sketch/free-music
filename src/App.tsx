@@ -25,7 +25,7 @@ interface MainContentProps {
 function MainContent({ currentView, setView, playlists, createPlaylist, removePlaylist, removeFromPlaylist }: MainContentProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchType, setSearchType] = useState('music');
-  const [searchResults, setSearchResults] = useState<unknown[]>([]);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [errorString, setErrorString] = useState<string | null>(null);
   const searchAbortController = useRef<AbortController | null>(null);
@@ -186,8 +186,8 @@ function MainContent({ currentView, setView, playlists, createPlaylist, removePl
         const bNum = typeof bVal === 'number' ? bVal : (Number(bVal) || 0);
         cmp = aNum - bNum;
       } else if (sortField === 'downloadedAt') {
-        const aNum = Number((a as Record<string, unknown>).downloadedAt || 0);
-        const bNum = Number((b as Record<string, unknown>).downloadedAt || 0);
+        const aNum = Number((a as any).downloadedAt || 0);
+        const bNum = Number((b as any).downloadedAt || 0);
         cmp = aNum - bNum;
       } else {
         cmp = String(aVal || '').localeCompare(String(bVal || ''));
@@ -435,7 +435,7 @@ function MainContent({ currentView, setView, playlists, createPlaylist, removePl
 
                       {currentView === 'downloads' ? (
                         <div className="w-1/4 text-[17px] leading-[25px] text-[#333336] truncate hidden sm:block cursor-pointer font-[400]" onClick={() => playSong(song, sortedSongs)}>
-                          {formatDate((song as Record<string, unknown>).downloadedAt as number | string)}
+                          {formatDate((song as any).downloadedAt as number | string)}
                         </div>
                       ) : (
                         <div 

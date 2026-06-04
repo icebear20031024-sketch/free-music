@@ -5,7 +5,7 @@ import { api, getProxiedCoverUrl } from '../services/api';
 
 import { Playlist, Song } from '../types';
 
-export function Sidebar({ currentView, setView, playlists, createPlaylist, removePlaylist }: { currentView: string; setView: (v: string) => void; playlists: Playlist[]; createPlaylist: (n: string) => void; removePlaylist: (id: string) => void; }) {
+export function Sidebar({ currentView, setView, playlists, createPlaylist, removePlaylist }: { currentView: string; setView: (v: string) => void; playlists: Playlist[]; createPlaylist: (n: string, initialItems?: Song[]) => void; removePlaylist: (id: string) => void; }) {
   const [newPlName, setNewPlName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [isImporting, setIsImporting] = useState(false);

@@ -124,10 +124,40 @@ async function searchBase(query, page, type) {
     })).data;
     return res;
 }
+async function enrichMusicItemsArtwork(songs) {
+    if (!songs || songs.length === 0) return songs;
+    try {
+        const songIds = songs.map(_ => _.id).filter(Boolean);
+        if (songIds.length > 0) {
+            const detailRes = await axios_1.default.get(`https://music.163.com/api/v1/song/detail/?ids=[${songIds.join(',')}]`, {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+                    Referer: 'https://music.163.com'
+                }
+            });
+            const detailedSongs = detailRes.data?.songs || [];
+            const picMap = {};
+            detailedSongs.forEach(song => {
+                if (song.id && song.al?.picUrl) {
+                    picMap[song.id] = song.al.picUrl;
+                }
+            });
+            songs.forEach(song => {
+                if (picMap[song.id]) {
+                    song.artwork = picMap[song.id];
+                }
+            });
+        }
+    } catch (err) {
+        console.error('Xiaoyun artwork batch enrichment failed:', err.message);
+    }
+    return songs;
+}
 async function searchMusic(query, page) {
     const res = await searchBase(query, page, 1);
     const songs = res.result.songs
         .map(formatMusicItem);
+    await enrichMusicItemsArtwork(songs);
     return {
         isEnd: res.result.songCount <= page * pageSize,
         data: songs,
@@ -226,9 +256,11 @@ async function getArtistWorks(artistItem, page, type) {
             headers,
             data: paeData,
         })).data;
+        const songs = (res.hotSongs || []).map(formatMusicItem);
+        await enrichMusicItemsArtwork(songs);
         return {
             isEnd: true,
-            data: res.hotSongs.map(formatMusicItem),
+            data: songs,
         };
     }
     else if (type === "album") {
@@ -272,20 +304,12 @@ async function getLyric(musicItem) {
 }
 async function getMusicInfo(musicItem) {
     const headers = {
-        Referer: "https://y.music.163.com/",
-        Origin: "https://y.music.163.com/",
-        authority: "music.163.com",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.135 Safari/537.36",
-        "Content-Type": "application/x-www-form-urlencoded",
+        Referer: "https://music.163.com",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
     };
-    const data = { id: musicItem.id, ids: `[${musicItem.id}]` };
-    const result = (await axios_1.get('http://music.163.com/api/song/detail',
-        {
-            headers,
-            params: data
-        })).data;
+    const result = (await axios_1.default.get(`https://music.163.com/api/v1/song/detail/?ids=[${musicItem.id}]`, { headers })).data;
     return {
-        artwork: result.songs[0].album.picUrl,
+        artwork: result.songs?.[0]?.al?.picUrl || result.songs?.[0]?.album?.picUrl || "",
     };
 }
 async function getAlbumInfo(albumItem) {
@@ -310,10 +334,11 @@ async function getAlbumInfo(albumItem) {
         headers,
         data: paeData,
     })).data;
+    const musicList = (res.songs || []).map(formatMusicItem);
+    await enrichMusicItemsArtwork(musicList);
     return {
         albumItem: { description: res.album.description },
-        musicList: (res.songs || [])
-            .map(formatMusicItem),
+        musicList,
     };
 }
 async function getValidMusicItems(trackIds) {
@@ -327,8 +352,9 @@ async function getValidMusicItems(trackIds) {
     try {
         // 获取歌曲详情数据
         const res = (await axios_1.default.get(`https://music.163.com/api/song/detail/?ids=[${trackIds.join(",")}]`, { headers })).data;
-        // 直接格式化歌曲项，不检查 URL
-        const validMusicItems = res.songs.map(formatMusicItem);
+        const validMusicItems = (res.songs || []).map(formatMusicItem);
+        // Direct enrichment
+        await enrichMusicItemsArtwork(validMusicItems);
         return validMusicItems;
     }
     catch (e) {

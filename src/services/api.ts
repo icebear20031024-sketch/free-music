@@ -52,7 +52,7 @@ class ApiServer {
     return formattedResults;
   }
 
-  searchStream(query: string, type: string, onData: (results: unknown[]) => void, signal?: AbortSignal, sources?: string[]): Promise<void> {
+  searchStream(query: string, type: string, onData: (results: any[]) => void, signal?: AbortSignal, sources?: string[]): Promise<void> {
     return new Promise((resolve, reject) => {
       const sParam = sources && sources.length > 0 ? `&sources=${encodeURIComponent(sources.join(','))}` : '';
       const eventSource = new EventSource(`/api/search/stream?q=${encodeURIComponent(query)}&type=${encodeURIComponent(type)}${sParam}`);

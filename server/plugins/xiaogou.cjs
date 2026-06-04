@@ -24,7 +24,7 @@ function formatMusicItem(_) {
     };
 }
 function formatMusicItem2(_) {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a, _b, _c, _d, _e, _f, _g, _h;
     return {
         id: _.hash,
         title: _.songname,
@@ -33,9 +33,13 @@ function formatMusicItem2(_) {
         album: (_g = _.album_name) !== null && _g !== void 0 ? _g : _.remark,
         album_id: _.album_id,
         album_audio_id: _.album_audio_id,
-        artwork: _.album_sizable_cover
-            ? _.album_sizable_cover.replace("{size}", "400")
-            : undefined,
+        artwork: (() => {
+            let cover = _.album_sizable_cover;
+            if (!cover && ((_h = _.trans_param) === null || _h === void 0 ? void 0 : _h.union_cover)) {
+                cover = _.trans_param.union_cover;
+            }
+            return cover ? cover.replace("{size}", "400") : undefined;
+        })(),
         duration: _.duration,
         "320hash": _["320hash"],
         sqhash: _.sqhash,
@@ -76,22 +80,17 @@ const headers = {
     "Accept-Language": "zh-CN,zh;q=0.9",
 };
 async function searchMusic(query, page) {
-    const res = (await axios_1.default.get("https://songsearch.kugou.com/song_search_v2", {
+    const res = (await axios_1.default.get("http://mobilecdn.kugou.com/api/v3/search/song", {
         headers,
         params: {
             keyword: query,
             page,
             pagesize: pageSize,
-            userid: 0,
-            clientver: "",
-            platform: "WebFilter",
-            filter: 2,
-            iscorrection: 1,
-            privilege_filter: 0,
-            area_code: 1,
+            showtype: 1,
+            format: "json",
         },
     })).data;
-    const songs = res.data.lists.map(formatMusicItem);
+    const songs = (res.data.info || []).map(formatMusicItem2);
     return {
         isEnd: page * pageSize >= res.data.total,
         data: songs,

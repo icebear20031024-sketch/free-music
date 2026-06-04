@@ -8,27 +8,89 @@ const CryptoJS = require("crypto-js");
 const searchRows = 20;
 async function searchBase(query, page, type) {
     const headers = {
-        Accept: "application/json, text/javascript, */*; q=0.01",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
-        Connection: "keep-alive",
-        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
-        Host: "m.music.migu.cn",
-        Referer: `https://m.music.migu.cn/v3/search?keyword=${encodeURIComponent(query)}`,
-        "Sec-Fetch-Dest": "empty",
-        "Sec-Fetch-Mode": "cors",
-        "Sec-Fetch-Site": "same-origin",
-        "User-Agent": "Mozilla/5.0 (Linux; Android 6.0.1; Moto G (4)) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.114 Mobile Safari/537.36 Edg/89.0.774.68",
-        "X-Requested-With": "XMLHttpRequest",
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.2 Mobile/15E148 Safari/604.1",
+        Referer: 'https://m.music.migu.cn/',
     };
-    const params = {
-        keyword: query,
-        type,
-        pgc: page,
-        rows: searchRows,
+    
+    let searchSwitch = '{"song":1}';
+    if (type === 4) {
+        searchSwitch = '{"album":1}';
+    } else if (type === 1) {
+        searchSwitch = '{"singer":1}';
+    } else if (type === 6) {
+        searchSwitch = '{"playlist":1}';
+    } else if (type === 7) {
+        searchSwitch = '{"lyric":1}';
+    }
+
+    const res = await axios_1.default.get("https://c.migu.cn/MIGUM2.0/v1.0/content/search_all.do", {
+        headers,
+        params: {
+            text: query,
+            pageNo: page,
+            pageSize: searchRows,
+            isCorrect: 1,
+            isCopyright: 1,
+            searchSwitch,
+        },
+    });
+
+    const body = res.data || {};
+    const resultObj = {
+        pageNo: page,
+        pgt: 0,
+        musics: [],
+        albums: [],
+        artists: [],
+        songLists: [],
+        songs: []
     };
-    const data = await axios_1.default.get("https://m.music.migu.cn/migu/remoting/scr_search_tag", { headers, params });
-    return data.data;
+
+    if (type === 2) {
+        const rd = body.songResultData || {};
+        resultObj.pgt = parseInt(rd.totalCount) || 0;
+        resultObj.musics = (rd.result || []).map((_) => {
+            const artwork = (_.imgItems || []).find(img => img.imgSizeType === "02")?.img || (_.imgItems || []).find(img => img.imgSizeType === "01")?.img || _.imgItems?.[0]?.img || "";
+            return {
+                id: _.id,
+                cover: artwork,
+                songName: _.name,
+                artist: (_.singers || []).map(s => s.name).join(", "),
+                albumName: (_.albums || [])[0]?.name || "",
+                copyrightId: _.copyrightId,
+                singerId: (_.singers || [])[0]?.id,
+                listenUrl: ""
+            };
+        });
+    } else if (type === 4) {
+        const rd = body.albumResultData || {};
+        resultObj.pgt = parseInt(rd.totalCount) || 0;
+        resultObj.albums = (rd.result || []).map((_) => {
+            const artwork = (_.imgItems || []).find(img => img.imgSizeType === "02")?.img || (_.imgItems || []).find(img => img.imgSizeType === "01")?.img || _.imgItems?.[0]?.img || "";
+            return {
+                id: _.id,
+                albumPicL: artwork,
+                title: _.name,
+                publishDate: _.publishDate,
+                singer: [{ name: _.singer }],
+                fullSongTotal: _.songCount || 0
+            };
+        });
+    } else if (type === 1) {
+        const rd = body.singerResultData || {};
+        resultObj.pgt = parseInt(rd.totalCount) || 0;
+        resultObj.artists = (rd.result || []).map((_) => {
+            const artwork = (_.imgItems || []).find(img => img.imgSizeType === "02")?.img || (_.imgItems || []).find(img => img.imgSizeType === "01")?.img || _.imgItems?.[0]?.img || "";
+            return {
+                title: _.name,
+                id: _.id,
+                artistPicL: artwork,
+                songNum: _.songNum || 0
+            };
+        });
+    }
+
+    return resultObj;
 }
 // function musicCanPlayFilter(_) {
 //     return _.lisSQ || _.lisHQ || _.lisBq || _.lisCr || _.lisQq || _.listenUrl ||  _.mp3;

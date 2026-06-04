@@ -13,7 +13,7 @@ import { Playlist, Song } from '../types';
 import { getProxiedCoverUrl } from '../services/api';
 import { CoverImage } from './CoverImage';
 
-export function PlayerBar({ playlists, toggleInPlaylist, isInPlaylist }: { playlists: Playlist[]; toggleInPlaylist: (song: Song, pid: string) => void; isInPlaylist: (id: string, pid?: string) => boolean; }) {
+export function PlayerBar({ playlists, toggleInPlaylist, isInPlaylist }: { playlists: Playlist[]; toggleInPlaylist: (pid: string, song: Song) => void; isInPlaylist: (pid: string, id: string) => boolean; }) {
   const { 
     currentSong, isPlaying, currentTime, duration, volume,
     togglePlay, playNext, playPrev, setVolume, handleSeek, showLyricsView, setShowLyricsView, audioRef, handleTimeUpdate,
@@ -41,7 +41,7 @@ export function PlayerBar({ playlists, toggleInPlaylist, isInPlaylist }: { playl
     handleSeek(percent);
   };
 
-  const formatDuration = (dt: number | string) => {
+  const formatDuration = (dt: number | string | undefined) => {
     if (!dt) return '--:--';
     if (typeof dt === 'string' && dt.includes(':')) return dt;
     let seconds = typeof dt === 'string' ? parseInt(dt, 10) : dt;
