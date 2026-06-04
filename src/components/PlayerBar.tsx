@@ -117,7 +117,15 @@ export function PlayerBar({ playlists, toggleInPlaylist, isInPlaylist }: { playl
               className="relative w-14 h-14 rounded-[8px] bg-[#EDEDF2] shrink-0 overflow-hidden cursor-pointer group border border-black/5 shadow-sm"
               onClick={() => setShowLyricsView(!showLyricsView)}
             >
-              <img src={currentSong.cover} alt="Cover" className="w-full h-full object-cover group-hover:opacity-75 transition-opacity" />
+              <img 
+                src={currentSong.cover} 
+                alt="Cover" 
+                className="w-full h-full object-cover group-hover:opacity-75 transition-opacity"
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  e.currentTarget.src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80';
+                }}
+              />
               <div className="absolute inset-0 bg-black/20 hidden group-hover:flex items-center justify-center text-white p-1">
                 {showLyricsView ? <ChevronDown className="w-6 h-6" /> : <Maximize2 className="w-6 h-6" />}
               </div>

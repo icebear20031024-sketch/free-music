@@ -1,5 +1,19 @@
 import { Song, LyricLine } from '../types';
 
+export function getProxiedCoverUrl(url: string | undefined): string {
+  const fallback = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&q=80';
+  if (!url) return fallback;
+  const strUrl = String(url).trim();
+  if (!strUrl) return fallback;
+  
+  if (strUrl.startsWith('http://') || strUrl.startsWith('https://')) {
+    if (strUrl.includes('/api/proxy?url=')) return strUrl;
+    if (strUrl.includes('unsplash.com')) return strUrl;
+    return `/api/proxy?url=${encodeURIComponent(strUrl)}`;
+  }
+  return strUrl;
+}
+
 class ApiServer {
   async search(query: string, sources?: string[]): Promise<Song[]> {
     const sParam = sources && sources.length > 0 ? `&sources=${encodeURIComponent(sources.join(','))}` : '';
@@ -21,7 +35,7 @@ class ApiServer {
             title: String(songData.title || songData.name || 'Unknown'),
             artist: String(songData.artist || songData.singer || 'Unknown'),
             album: String(songData.album || 'Unknown'),
-            cover: String(songData.artwork || songData.pic || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&q=80'),
+            cover: getProxiedCoverUrl(String(songData.artwork || songData.pic || songData.coverImg || '')),
             duration: Number(songData.duration || songData.interval || songData.time || songData.dt || 0),
             source: pluginResult.platform || pluginResult.sourceId,
             sourceId: pluginResult.sourceId,
@@ -59,7 +73,7 @@ class ApiServer {
                   title: String(songData.title || songData.name || 'Unknown'),
                   artist: String(songData.artist || songData.singer || 'Unknown'),
                   album: String(songData.album || 'Unknown'),
-                  cover: String(songData.artwork || songData.pic || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&q=80'),
+                  cover: getProxiedCoverUrl(String(songData.artwork || songData.pic || songData.coverImg || '')),
                   duration: Number(songData.duration || songData.interval || songData.time || songData.dt || 0),
                   source: pluginResult.platform || pluginResult.sourceId,
                   sourceId: pluginResult.sourceId,

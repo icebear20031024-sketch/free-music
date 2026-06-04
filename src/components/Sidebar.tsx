@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Music, Home, Search, Library, Heart, ListMusic, Download, Plus, Trash2, Import, Loader2 } from 'lucide-react';
 import { Settings } from 'lucide-react';
-import { api } from '../services/api';
+import { api, getProxiedCoverUrl } from '../services/api';
 
 import { Playlist, Song } from '../types';
 
@@ -67,7 +67,7 @@ export function Sidebar({ currentView, setView, playlists, createPlaylist, remov
                  title: String(m.title || m.name || 'Unknown'),
                  artist: String(m.artist || m.singer || 'Unknown'),
                  album: String(m.album || 'Unknown'),
-                 cover: String(m.artwork || m.pic || m.coverImg || m.avatar || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&q=80'),
+                 cover: getProxiedCoverUrl(String(m.artwork || m.pic || m.coverImg || m.avatar || '')),
                  duration: Number(m.duration || m.interval || m.time || m.dt || 0),
                  source: successSourceId as string,
                  sourceId: successSourceId as string,

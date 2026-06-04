@@ -8,7 +8,7 @@ import { usePlaylists } from './hooks/usePlaylists';
 import { useDownloads } from './hooks/useDownloads';
 import { Music, AlertCircle, ArrowUp, ArrowDown, Download, CheckCircle, Trash2, Plus, User, Disc, FileAudio, Folder } from 'lucide-react';
 import { Playlist, Song } from './types';
-import { api } from './services/api';
+import { api, getProxiedCoverUrl } from './services/api';
 
 type SortField = 'title' | 'artist' | 'duration' | 'downloadedAt' | null;
 
@@ -263,7 +263,7 @@ function MainContent({ currentView, setView, playlists, createPlaylist, removePl
                  title: String(m.title || m.name || 'Unknown'),
                  artist: String(m.artist || m.singer || 'Unknown'),
                  album: String(m.album || 'Unknown'),
-                 cover: String(m.artwork || m.pic || itemRec.coverImg || itemRec.avatar || itemRec.artwork || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&q=80'),
+                 cover: getProxiedCoverUrl(String(m.artwork || m.pic || m.coverImg || itemRec.coverImg || itemRec.avatar || itemRec.artwork || '')),
                  duration: Number(m.duration || m.interval || m.time || m.dt || 0),
                  source: sourceId,
                  sourceId: sourceId,
@@ -342,7 +342,7 @@ function MainContent({ currentView, setView, playlists, createPlaylist, removePl
                             onClick={() => loadRemoteList(searchType, item.sourceId, item)}
                             className="flex flex-col gap-3 group cursor-pointer hover:bg-[#F5F5F7] p-6 rounded-[16px] border border-transparent hover:border-[#EDEDF2] transition-colors">
                            <div className="w-full aspect-square relative rounded-[12px] overflow-hidden bg-[#EDEDF2]">
-                              <img src={item.coverImg || item.avatar || item.artwork || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80'} 
+                              <img src={getProxiedCoverUrl(item.coverImg || item.avatar || item.artwork)} referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80'; }} 
                                    alt={item.title || item.name}
                                    className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${searchType === 'artist' ? 'rounded-full scale-90 group-hover:scale-100 shadow-sm' : ''}`} />
                            </div>
@@ -411,6 +411,10 @@ function MainContent({ currentView, setView, playlists, createPlaylist, removePl
                         <img 
                           src={song.cover || 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=80&q=80'} 
                           alt={song.title} 
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            e.currentTarget.src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=80&q=80';
+                          }}
                           className="w-11 h-11 object-cover flex-shrink-0 bg-[#EDEDF2] border border-[#rgba(0,0,0,0.05)] shadow-sm"
                         />
                         <div className="flex-1 min-w-0 flex flex-col justify-center">

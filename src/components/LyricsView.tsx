@@ -56,7 +56,15 @@ export function LyricsView() {
         {/* Record player visual area */}
         <div className="flex-1 flex flex-col items-center justify-center max-w-sm">
           <div className={`relative w-80 h-80 rounded-[16px] bg-[#EDEDF2] flex items-center justify-center shadow-lg transition-transform duration-[20s] linear ${isPlaying ? 'scale-105' : 'scale-100'} overflow-hidden border border-black/5`}>
-            <img src={currentSong.cover} alt={currentSong.title} className="w-full h-full object-cover" />
+            <img 
+              src={currentSong.cover} 
+              alt={currentSong.title} 
+              className="w-full h-full object-cover" 
+              referrerPolicy="no-referrer"
+              onError={(e) => {
+                e.currentTarget.src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80';
+              }}
+            />
           </div>
           <div className="mt-8 text-center">
             <h2 className="text-[28px] leading-[32px] font-[700] text-[#1D1D1F] tracking-tight mb-2">{currentSong.title}</h2>
