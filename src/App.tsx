@@ -338,7 +338,7 @@ function MainContent({ currentView, setView, playlists, createPlaylist, removePl
          <SearchBar 
            searchQuery={searchQuery} 
            setSearchQuery={setSearchQuery} 
-           onSearch={handleSearch} 
+           onSearch={(e, query) => handleSearch(e, undefined, query)} 
            selectedSources={selectedSources}
            onToggleSource={handleToggleSource}
          />
@@ -386,7 +386,7 @@ function MainContent({ currentView, setView, playlists, createPlaylist, removePl
                             onClick={() => loadRemoteList(searchType, item.sourceId, item)}
                             className="flex flex-col gap-3 group cursor-pointer hover:bg-[#F5F5F7] p-6 rounded-[16px] border border-transparent hover:border-[#EDEDF2] transition-colors">
                            <div className="w-full aspect-square relative rounded-[12px] overflow-hidden bg-[#EDEDF2]">
-                              <img src={getProxiedCoverUrl(item.coverImg || item.avatar || item.artwork)} referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80'; }} 
+                              <img src={getProxiedCoverUrl(item.coverImg || item.avatar || item.artwork || item.pic)} referrerPolicy="no-referrer" onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&q=80'; }} 
                                    alt={item.title || item.name}
                                    className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${searchType === 'artist' ? 'rounded-full scale-90 group-hover:scale-100 shadow-sm' : ''}`} />
                            </div>

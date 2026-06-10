@@ -29,6 +29,7 @@ export function CoverImage({
     setIsError(false);
 
     const img = new Image();
+    img.referrerPolicy = 'no-referrer';
     img.src = src;
 
     // Optional safety timeout for slow networks (5 seconds)

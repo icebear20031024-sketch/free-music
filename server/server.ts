@@ -6,6 +6,14 @@ import { pluginManager } from './plugin-manager.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { logger } from './utils/logger.js';
 
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 const app = express();
 const PORT = 3000;
 
@@ -47,7 +55,6 @@ async function startServer() {
     });
   } catch (error) {
     logger.error('Failed to start server:', error);
-    process.exit(1);
   }
 }
 

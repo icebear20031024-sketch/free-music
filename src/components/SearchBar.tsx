@@ -4,7 +4,7 @@ import { Search, Check, SlidersHorizontal } from 'lucide-react';
 interface SearchBarProps {
   searchQuery: string;
   setSearchQuery: (q: string) => void;
-  onSearch: (e?: React.FormEvent) => void;
+  onSearch: (e?: React.FormEvent, overrideQuery?: string) => void;
   selectedSources?: string[];
   onToggleSource?: (id: string) => void;
 }
@@ -115,7 +115,7 @@ export function SearchBar({
                     setHistory(newHistory);
                     localStorage.setItem('search_history', JSON.stringify(newHistory));
                     setIsFocused(false);
-                    onSearch();
+                    onSearch(undefined, suggestion);
                   }, 0);
                 }}
               >

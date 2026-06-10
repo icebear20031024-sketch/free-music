@@ -301,6 +301,7 @@ async function getLyric(musicItem) {
     })).data;
     const res = JSON.parse(result.replace(/callback\(|MusicJsonCallback\(|jsonCallback\(|\)$/g, ""));
     let translation;
+    console.log("res keys:", Object.keys(res), "trans length:", res.trans?.length);
     if (res.trans) {
         translation = he.decode(CryptoJs.enc.Base64.parse(res.trans).toString(CryptoJs.enc.Utf8));
     }

@@ -39,7 +39,7 @@ class ApiServer {
             title: String(songData.title || songData.name || 'Unknown'),
             artist: String(songData.artist || songData.singer || 'Unknown'),
             album: String(songData.album || 'Unknown'),
-            cover: getProxiedCoverUrl(String(songData.artwork || songData.pic || songData.coverImg || '')),
+            cover: getProxiedCoverUrl((songData.artwork || songData.pic || songData.coverImg) as string | undefined),
             duration: Number(songData.duration || songData.interval || songData.time || songData.dt || 0),
             source: pluginResult.platform || pluginResult.sourceId,
             sourceId: pluginResult.sourceId,
@@ -77,7 +77,7 @@ class ApiServer {
                   title: String(songData.title || songData.name || 'Unknown'),
                   artist: String(songData.artist || songData.singer || 'Unknown'),
                   album: String(songData.album || 'Unknown'),
-                  cover: getProxiedCoverUrl(String(songData.artwork || songData.pic || songData.coverImg || '')),
+                  cover: getProxiedCoverUrl((songData.artwork || songData.pic || songData.coverImg) as string | undefined),
                   duration: Number(songData.duration || songData.interval || songData.time || songData.dt || 0),
                   source: pluginResult.platform || pluginResult.sourceId,
                   sourceId: pluginResult.sourceId,
@@ -175,18 +175,30 @@ class ApiServer {
         const lyricLines = this.parseLyric(raw);
         if (translationRaw) {
           const transLines = this.parseLyric(translationRaw);
-          lyricLines.forEach(line => {
+          const rawTransLines = translationRaw.split('\\n').filter((l: string) => l.trim().length > 0 && !l.includes('[ti:') && !l.includes('[ar:') && !l.includes('[al:') && !l.includes('[by:') && !l.includes('[offset:'));
+          
+          lyricLines.forEach((line, index) => {
             let bestMatch: LyricLine | null = null;
-            let minDiff = 0.5; // max 500ms alignment window
-            for (const t of transLines) {
-              const diff = Math.abs(t.time - line.time);
-              if (diff < minDiff) {
-                minDiff = diff;
-                bestMatch = t;
+            let minDiff = 2.0; // max 2s alignment window
+            
+            if (transLines.length > 0) {
+              for (const t of transLines) {
+                const diff = Math.abs(t.time - line.time);
+                if (diff < minDiff) {
+                  minDiff = diff;
+                  bestMatch = t;
+                }
               }
             }
+            
             if (bestMatch) {
               line.translation = bestMatch.text;
+            } else if (transLines.length === 0 && rawTransLines[index]) {
+              // Fallback to line index if no timestamps available
+              const rawTrans = rawTransLines[index].replace(/\\[.*?\\]/g, '').trim();
+              if (rawTrans) {
+                 line.translation = rawTrans;
+              }
             }
           });
         }
@@ -202,15 +214,27 @@ class ApiServer {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       const timeExp = /\[(\d{2,}):(\d{2})(?:\.(\d{2,3}))?\]/g;
-      const text = line.replace(timeExp, '').trim();
+      const rawText = line.replace(timeExp, '').trim();
+      let mainText = rawText;
+      let translationText = '';
+      if (rawText.includes('//')) {
+        const parts = rawText.split('//');
+        mainText = parts[0].trim();
+        translationText = parts.slice(1).join('//').trim();
+      } else if (rawText.includes('\\n')) {
+        const parts = rawText.split('\\n');
+        mainText = parts[0].trim();
+        translationText = parts.slice(1).join(' ').trim();
+      }
+
       let match;
       while ((match = timeExp.exec(line)) !== null) {
         const minutes = parseInt(match[1], 10);
         const seconds = parseInt(match[2], 10);
         const milliseconds = match[3] ? parseInt(match[3], 10) : 0;
         const time = minutes * 60 + seconds + milliseconds / (match[3] && match[3].length === 3 ? 1000 : 100);
-        if (text) {
-          result.push({ time, text });
+        if (mainText) {
+          result.push({ time, text: mainText, translation: translationText || undefined });
         }
       }
     }
