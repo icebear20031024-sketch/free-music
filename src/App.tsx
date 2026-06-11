@@ -71,7 +71,35 @@ function MainContent({ currentView, setView, playlists, createPlaylist, removePl
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   const { playSong, currentSong, playlist } = usePlayer();
-  const { downloads, downloadSong, removeDownload, isDownloaded, isDownloading, downloadProgress } = useDownloads();
+  const { downloads, downloadSong, removeDownload, isDownloaded, isDownloading, downloadProgress, importLocalFile } = useDownloads();
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportLocal = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    try {
+      for (let i = 0; i < files.length; i++) {
+        await importLocalFile(files[i]);
+      }
+      setToast({
+        message: `成功导入 ${files.length} 首本地歌曲`,
+      });
+      setTimeout(() => {
+        setToast(curr => curr?.message.includes('成功导入') ? null : curr);
+      }, 3000);
+    } catch (err: any) {
+      setToast({
+        message: `导入失败: ${err.message || String(err)}`
+      });
+      setTimeout(() => {
+        setToast(curr => curr?.message.includes('导入失败:') ? null : curr);
+      }, 5000);
+    }
+    if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+    }
+  };
 
   const handleDownload = async (song: Song, quality?: string) => {
     try {
@@ -333,6 +361,7 @@ function MainContent({ currentView, setView, playlists, createPlaylist, removePl
   return (
     <main className="flex-1 flex flex-col min-w-0 relative h-full pb-20">
       <LyricsView />
+      <input type="file" ref={fileInputRef} onChange={handleImportLocal} multiple accept="audio/*" className="hidden" />
       
       <div className="flex px-8 py-[18px] border-b border-[#EDEDF2] items-center justify-between z-10 shrink-0 bg-white/90 backdrop-blur-md sticky top-0">
          <SearchBar 
@@ -376,6 +405,16 @@ function MainContent({ currentView, setView, playlists, createPlaylist, removePl
                </h2>
                {isSearching && (
                  <div className="w-5 h-5 border-[2px] border-[#0071E3]/30 border-t-[#0071E3] rounded-full animate-spin mt-1"></div>
+               )}
+               <div className="flex-1" />
+               {currentView === 'downloads' && (
+                 <button 
+                   onClick={() => fileInputRef.current?.click()}
+                   className="px-4 py-2 bg-[#0071E3] text-white rounded-full text-[14px] font-medium hover:bg-[#0051A3] transition-colors flex items-center gap-2"
+                 >
+                   <Plus className="w-4 h-4" />
+                   导入本地音乐
+                 </button>
                )}
             </div>
 
@@ -590,11 +629,22 @@ function MainContent({ currentView, setView, playlists, createPlaylist, removePl
             )}
           </div>
         ) : (
-           <div className="flex flex-col items-center justify-center h-full text-[#6E6E73] mt-20">
+            <div className="flex flex-col items-center justify-center h-full text-[#6E6E73] mt-20">
               <Music className="w-20 h-20 mb-6 opacity-30 stroke-[1.5px]" />
               <p className="text-center font-[400] text-[17px]">
                 {getEmptyStateText()}
               </p>
+              {currentView === 'downloads' && (
+                <div className="mt-6">
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-6 py-2.5 bg-[#0071E3] text-white rounded-full text-[15px] font-medium hover:bg-[#0051A3] transition-colors flex items-center gap-2"
+                  >
+                    <Plus className="w-[18px] h-[18px]" />
+                    导入本地音乐
+                  </button>
+                </div>
+              )}
            </div>
         )}
       </div>

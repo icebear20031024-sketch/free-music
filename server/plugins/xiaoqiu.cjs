@@ -292,21 +292,61 @@ async function getArtistWorks(artistItem, page, type) {
     }
 }
 async function getLyric(musicItem) {
-    const result = (await (0, axios_1.default)({
-        url: `http://c.y.qq.com/lyric/fcgi-bin/fcg_query_lyric_new.fcg?songmid=${musicItem.songmid}&pcachetime=${new Date().getTime()}&g_tk=5381&loginUin=0&hostUin=0&inCharset=utf8&outCharset=utf-8&notice=0&platform=yqq&needNewCode=0`,
-        headers: { Referer: "https://y.qq.com", Cookie: "uin=" },
-        method: "get",
-        xsrfCookieName: "XSRF-TOKEN",
-        withCredentials: true,
-    })).data;
-    const res = JSON.parse(result.replace(/callback\(|MusicJsonCallback\(|jsonCallback\(|\)$/g, ""));
-    let translation;
-    console.log("res keys:", Object.keys(res), "trans length:", res.trans?.length);
-    if (res.trans) {
-        translation = he.decode(CryptoJs.enc.Base64.parse(res.trans).toString(CryptoJs.enc.Utf8));
+    let rawLrc, translation;
+
+    try {
+        const payload = {
+            comm: { ct: '19', cv: '1859', uin: '0' },
+            req: {
+                method: 'GetPlayLyricInfo',
+                module: 'music.musichallSong.PlayLyricInfo',
+                param: {
+                    songMID: musicItem.songmid,
+                    trans: 1,
+                    trans_t: 0
+                }
+            }
+        };
+        const resultMsg = (await axios_1.default.post(`https://u.y.qq.com/cgi-bin/musicu.fcg`, payload, {
+            headers: {
+                referer: 'https://y.qq.com',
+                'user-agent': 'Mozilla/5.0'
+            }
+        })).data;
+        
+        if (resultMsg?.req?.data?.lyric) {
+            rawLrc = he.decode(Buffer.from(resultMsg.req.data.lyric, 'base64').toString('utf8'));
+        }
+        if (resultMsg?.req?.data?.trans) {
+            translation = he.decode(Buffer.from(resultMsg.req.data.trans, 'base64').toString('utf8'));
+        }
+    } catch (e) {
+        console.error("musicu getLyric failed", e);
     }
+    
+    // Fallback to legacy API if the above fails to return rawLrc
+    if (!rawLrc) {
+        try {
+            const result = (await (0, axios_1.default)({
+                url: `http://c.y.qq.com/lyric/fcgi-bin/fcg_query_lyric_new.fcg?songmid=${musicItem.songmid}&pcachetime=${new Date().getTime()}&g_tk=5381&loginUin=0&hostUin=0&inCharset=utf8&outCharset=utf-8&notice=0&platform=yqq&needNewCode=0`,
+                headers: { Referer: "https://y.qq.com", Cookie: "uin=" },
+                method: "get",
+                xsrfCookieName: "XSRF-TOKEN",
+            })).data;
+            const res = JSON.parse(result.replace(/callback\(|MusicJsonCallback\(|jsonCallback\(|\)$/g, ""));
+            if (res.trans) {
+                translation = he.decode(CryptoJs.enc.Base64.parse(res.trans).toString(CryptoJs.enc.Utf8));
+            }
+            if (res.lyric) {
+                rawLrc = he.decode(CryptoJs.enc.Base64.parse(res.lyric).toString(CryptoJs.enc.Utf8));
+            }
+        } catch (e) {
+            console.error("Fallback get rawLrc failed", e);
+        }
+    }
+    
     return {
-        rawLrc: he.decode(CryptoJs.enc.Base64.parse(res.lyric).toString(CryptoJs.enc.Utf8)),
+        rawLrc,
         translation,
     };
 }
