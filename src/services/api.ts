@@ -175,32 +175,39 @@ class ApiServer {
         const lyricLines = this.parseLyric(raw);
         if (translationRaw) {
           const transLines = this.parseLyric(translationRaw);
-          const rawTransLines = translationRaw.split('\\n').filter((l: string) => l.trim().length > 0 && !l.includes('[ti:') && !l.includes('[ar:') && !l.includes('[al:') && !l.includes('[by:') && !l.includes('[offset:'));
+          const rawTransLines = translationRaw.split('\n').filter((l: string) => l.trim().length > 0 && !l.includes('[ti:') && !l.includes('[ar:') && !l.includes('[al:') && !l.includes('[by:') && !l.includes('[offset:'));
           
-          lyricLines.forEach((line, index) => {
-            let bestMatch: LyricLine | null = null;
-            let minDiff = 2.0; // max 2s alignment window
-            
-            if (transLines.length > 0) {
-              for (const t of transLines) {
+          if (transLines.length > 0) {
+            const usedLyrics = new Set<LyricLine>();
+            for (const t of transLines) {
+              let bestMatch: LyricLine | null = null;
+              let minDiff = 0.5; // max 0.5s alignment window
+              for (const line of lyricLines) {
+                if (usedLyrics.has(line)) continue;
                 const diff = Math.abs(t.time - line.time);
                 if (diff < minDiff) {
                   minDiff = diff;
-                  bestMatch = t;
+                  bestMatch = line;
                 }
               }
-            }
-            
-            if (bestMatch) {
-              line.translation = bestMatch.text;
-            } else if (transLines.length === 0 && rawTransLines[index]) {
-              // Fallback to line index if no timestamps available
-              const rawTrans = rawTransLines[index].replace(/\\[.*?\\]/g, '').trim();
-              if (rawTrans) {
-                 line.translation = rawTrans;
+              if (bestMatch) {
+                bestMatch.translation = t.translation || t.text || undefined;
+                if (bestMatch.translation === bestMatch.text) {
+                  bestMatch.translation = undefined;
+                }
+                usedLyrics.add(bestMatch);
               }
             }
-          });
+          } else {
+            lyricLines.forEach((line, index) => {
+              if (rawTransLines[index]) {
+                const rawTrans = rawTransLines[index].replace(/\[.*?\]/g, '').trim();
+                if (rawTrans && rawTrans !== line.text) {
+                   line.translation = rawTrans;
+                }
+              }
+            });
+          }
         }
         return lyricLines;
       }
@@ -221,11 +228,8 @@ class ApiServer {
         const parts = rawText.split('//');
         mainText = parts[0].trim();
         translationText = parts.slice(1).join('//').trim();
-      } else if (rawText.includes('\\n')) {
-        const parts = rawText.split('\\n');
-        mainText = parts[0].trim();
-        translationText = parts.slice(1).join(' ').trim();
       }
+      mainText = mainText.replace(/\\n/g, ' ').trim();
 
       let match;
       while ((match = timeExp.exec(line)) !== null) {
@@ -233,7 +237,7 @@ class ApiServer {
         const seconds = parseInt(match[2], 10);
         const milliseconds = match[3] ? parseInt(match[3], 10) : 0;
         const time = minutes * 60 + seconds + milliseconds / (match[3] && match[3].length === 3 ? 1000 : 100);
-        if (mainText) {
+        if (mainText || translationText) {
           result.push({ time, text: mainText, translation: translationText || undefined });
         }
       }
