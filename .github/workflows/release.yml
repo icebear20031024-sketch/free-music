@@ -108,6 +108,24 @@ jobs:
         working-directory: android
         run: ./gradlew assembleRelease --no-daemon
 
+      - name: Verify APK contains the app classes
+        run: |
+          # Gradle only sees the manifest's class names as strings, so a missing
+          # source file still produces a "successful" APK that crashes on launch.
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          unzip -o -q "$APK" 'classes*.dex' -d /tmp/apkdex
+          for CLASS in \
+            Lcom/yutao/music/MainActivity\; \
+            Lcom/yutao/music/floatinglyrics/FloatingLyricsPlugin\; \
+            Lcom/yutao/music/floatinglyrics/FloatingLyricsService\; ; do
+            if grep -qF "$CLASS" /tmp/apkdex/classes*.dex; then
+              echo "OK   $CLASS"
+            else
+              echo "MISS $CLASS"
+              exit 1
+            fi
+          done
+
       - name: Rename APK
         run: |
           mkdir -p out
