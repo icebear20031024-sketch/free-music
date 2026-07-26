@@ -1,9 +1,8 @@
 import path from 'path';
 import fs from 'fs/promises';
 import { logger } from './utils/logger.js';
+import { PLUGINS_DIR } from './utils/paths.js';
 import { InternalPluginInterface } from '../src/types.js';
-
-const PLUGINS_DIR = path.join(process.cwd(), 'server', 'plugins');
 
 // Pre-configured plugins
 const PLUGINS_CONFIG = [
@@ -79,6 +78,10 @@ class PluginManager {
 
   getAllPlugins() {
     return Object.entries(this.loadedPlugins);
+  }
+
+  getPluginIds() {
+    return Object.keys(this.loadedPlugins);
   }
 }
 

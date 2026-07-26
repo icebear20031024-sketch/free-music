@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import localforage from 'localforage';
 import { Song, LyricLine } from '../types';
 import { api } from '../services/api';
+import { apiUrl } from '../platform/runtime';
 
 export interface DownloadedSong extends Song {
   downloadedAt: number;
@@ -47,17 +48,37 @@ export function useDownloads() {
     });
 
     try {
-      // Always query a live URL matching the target quality description
-      const url = await api.getMediaUrl(song, quality);
+      // Try to get URL from primary source, fallback to alternative sources if it fails
+      let url = '';
+      let activeSong = { ...song };
+      try {
+        url = await api.getMediaUrl(song, quality);
+      } catch (err) {
+        if (song.alternativeSources && song.alternativeSources.length > 0) {
+          let success = false;
+          for (const alt of song.alternativeSources) {
+            try {
+              const altSong = { ...song, sourceId: alt.sourceId, raw: alt.raw };
+              url = await api.getMediaUrl(altSong, quality);
+              activeSong = altSong;
+              success = true;
+              break;
+            } catch (e) {}
+          }
+          if (!success) throw err;
+        } else {
+          throw err;
+        }
+      }
       if (!url) throw new Error('No URL found');
 
-      // Fetch lyrics
-      const lyrics = await api.getLyrics(song).catch(() => []);
+      // Fetch lyrics matching the successful active source
+      const lyrics = await api.getLyrics(activeSong).catch(() => []);
 
       // Use our backend proxy to avoid CORS issues, but check if it's already a proxy or relative URL
       let proxyUrl = url;
       if (url.startsWith('http://') || url.startsWith('https://')) {
-        proxyUrl = `/api/proxy?url=${encodeURIComponent(url)}`;
+        proxyUrl = apiUrl(`/api/proxy?url=${encodeURIComponent(url)}`);
       }
       const response = await fetch(proxyUrl);
       if (!response.ok) throw new Error('Failed to fetch audio data from proxy');

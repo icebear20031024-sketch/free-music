@@ -606,9 +606,12 @@ async function getMediaSourceByMTM(musicItem, quality) {
                 cpid: musicItem.copyrightId,
             },
         })).data.data;
+        if (!result) throw new Error("Migu API returned no data");
+        const url = result.listenUrl || result.listenQq || result.lisCr || result.mp3;
+        if (!url) throw new Error("Migu API response has no playable URL (API may have changed)");
         return {
-            artwork: musicItem.artwork || result.picL,
-            url: result.listenUrl || result.listenQq || result.lisCr,
+            artwork: musicItem.artwork || result.picL || result.cover,
+            url,
         };
     }
 }
@@ -620,35 +623,52 @@ const qualityLevels = {
     flac: "flac",
     wav: "wav",
 };
-async function getMediaSource(musicItem, quality) {
+async function getMediaSource(musicItem, quality, refresh = false) {
+    // 1. Try public API first
     try {
         const res = (
-            await axios_1.default.get(`https://lxmusicapi.onrender.com/url/mg/${musicItem.id}/${qualityLevels[quality]}`, {
+            await axios_1.default.get(`https://lxmusicapi.onrender.com/url/mg/${musicItem.id}/${qualityLevels[quality]}?refresh=${refresh}`, {
                 headers: {
                     "X-Request-Key": "share-v3"
                 },
+                timeout: 5000,
             })
         ).data;
-        if (!res || !res.url || (res.msg && res.msg !== "success") || res.url.includes("panspace.kuwo.cn")) {
-            throw new Error(res && res.msg ? res.msg : "无法获取播放链接");
+        if (res && res.url && !res.url.includes("panspace.kuwo.cn") && (!res.msg || res.msg === "success")) {
+            return { url: res.url };
         }
-        return {
-            url: res.url,
-        };
     } catch (err) {
-        if (process.env.NODE_ENV === 'test' || typeof globalThis.XMLHttpRequest !== 'undefined') {
-            throw err;
-        }
-        try {
-            const fallback = await getMediaSourceByMTM(musicItem, "standard");
-            if (fallback && fallback.url) {
-                return { url: fallback.url };
-            }
-        } catch (fallbackErr) {
-            console.error("Migu fallback failed:", fallbackErr.message);
-        }
-        throw err;
+        // Fallback to local
     }
+
+    // 2. Try local API
+    if (process.env.LX_API_URL) {
+        try {
+            const res = (
+                await axios_1.default.get(`${process.env.LX_API_URL}/url/mg/${musicItem.id}/${qualityLevels[quality]}?refresh=${refresh}`, {
+                    headers: {
+                        "X-Request-Key": "share-v3"
+                    },
+                    timeout: 5000,
+                })
+            ).data;
+            if (res && res.url && !res.url.includes("panspace.kuwo.cn") && (!res.msg || res.msg === "success")) {
+                return { url: res.url };
+            }
+        } catch (err) {
+            // Proceed to MTM
+        }
+    }
+    // MTM fallback: direct migu API
+    try {
+        const fallback = await getMediaSourceByMTM(musicItem, quality === "standard" ? "standard" : quality);
+        if (fallback && fallback.url) {
+            return { url: fallback.url };
+        }
+    } catch (fallbackErr) {
+        console.error("Migu MTM fallback failed:", fallbackErr.message);
+    }
+    throw new Error("无法获取播放链接");
 }
 module.exports = {
     platform: "小蜜音乐",

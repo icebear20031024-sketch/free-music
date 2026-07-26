@@ -1,7 +1,12 @@
 node_modules/
 build/
 dist/
+dist-electron/
+release/
 coverage/
+server/.vitest-*
+server/data/
+android/keystore.properties
 .DS_Store
 *.log
 .env*
