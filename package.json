@@ -2,6 +2,11 @@
   "name": "music",
   "productName": "Music",
   "description": "跨平台音乐播放器，支持桌面/移动端悬浮歌词",
+  "author": {
+    "name": "icebear0828",
+    "email": "mesolovealmomani521@gmail.com"
+  },
+  "homepage": "https://github.com/icebear0828/free-music",
   "private": true,
   "version": "1.0.0",
   "type": "module",
