@@ -3,6 +3,7 @@
             "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const axios_1 = require("axios");
+const sourceHelpers = require("./_source-helpers.cjs");
 const cheerio_1 = require("cheerio");
 const CryptoJS = require("crypto-js");
 const searchRows = 20;
@@ -624,51 +625,16 @@ const qualityLevels = {
     wav: "wav",
 };
 async function getMediaSource(musicItem, quality, refresh = false) {
-    // 1. Try public API first
-    try {
-        const res = (
-            await axios_1.default.get(`https://lxmusicapi.onrender.com/url/mg/${musicItem.id}/${qualityLevels[quality]}?refresh=${refresh}`, {
-                headers: {
-                    "X-Request-Key": "share-v3"
-                },
-                timeout: 5000,
-            })
-        ).data;
-        if (res && res.url && !res.url.includes("panspace.kuwo.cn") && (!res.msg || res.msg === "success")) {
-            return { url: res.url };
-        }
-    } catch (err) {
-        // Fallback to local
-    }
-
-    // 2. Try local API
-    if (process.env.LX_API_URL) {
-        try {
-            const res = (
-                await axios_1.default.get(`${process.env.LX_API_URL}/url/mg/${musicItem.id}/${qualityLevels[quality]}?refresh=${refresh}`, {
-                    headers: {
-                        "X-Request-Key": "share-v3"
-                    },
-                    timeout: 5000,
-                })
-            ).data;
-            if (res && res.url && !res.url.includes("panspace.kuwo.cn") && (!res.msg || res.msg === "success")) {
-                return { url: res.url };
-            }
-        } catch (err) {
-            // Proceed to MTM
-        }
-    }
-    // MTM fallback: direct migu API
-    try {
-        const fallback = await getMediaSourceByMTM(musicItem, quality === "standard" ? "standard" : quality);
-        if (fallback && fallback.url) {
-            return { url: fallback.url };
-        }
-    } catch (fallbackErr) {
-        console.error("Migu MTM fallback failed:", fallbackErr.message);
-    }
-    throw new Error("无法获取播放链接");
+    return sourceHelpers.resolveMedia({
+        lxSource: "mg",
+        lxId: musicItem.id,
+        quality: qualityLevels[quality],
+        refresh,
+        direct: async () => {
+            const fallback = await getMediaSourceByMTM(musicItem, quality === "standard" ? "standard" : quality);
+            return (fallback && fallback.url) || null;
+        },
+    });
 }
 module.exports = {
     platform: "小蜜音乐",

@@ -125,7 +125,28 @@ npm run mobile:run:android # 构建并安装到已连接的 Android 设备
 | :--- | :--- | :--- |
 | `PORT` | `15000` | 音乐播放器的 Web 服务端口 |
 | `HMR_PORT` | `15001` | Vite 模块热更新 (Hot Module Replacement) 监听端口 |
-| `LX_API_URL` | `http://localhost:8080` | 外链解析 API 地址（可选） |
+| `LX_API_URL` | 无 | 外链解析 API 地址（可选，等价于只填一个地址的 `LX_API_URLS`） |
+| `LX_API_URLS` | 无 | 逗号分隔的外链解析 API 列表，按顺序尝试，排在公共 API 之前 |
+| `LX_API_KEY` | `share-v3` | 外链解析 API 的 `X-Request-Key` |
+| `LX_API_DISABLE_PUBLIC` | 无 | 设为 `1` 时不再请求公共 API，只用自建地址 |
+
+### 播放链接是怎么解析的
+
+每个平台按顺序尝试：**外链解析 API → 平台自家接口**。两步都失败时，服务端会拿歌名+歌手去
+其他平台搜同一首歌，只有标题与歌手都对得上的结果才会试播（最多 6 个候选）。
+
+公共外链 API 是所有人共用的，请求过猛会按 IP 封禁并对**所有**平台返回
+`禁止批量下载`，表现就是每首歌都「无法获取播放链接」。为此客户端做了限流、
+结果缓存和熔断：某个地址返回封禁/限流后会停用 10 分钟，期间直接走平台自家接口。
+需要稳定播放建议自建一份并填进 `LX_API_URLS`。
+
+以下变量为可选，填了就用你自己的账号解析（不填则只能播放各平台公开可听的部分）：
+
+| 变量名 | 说明 |
+| :--- | :--- |
+| `NETEASE_COOKIE` | 网易云登录 Cookie |
+| `QQ_MUSIC_COOKIE` / `QQ_MUSIC_UIN` | QQ 音乐登录 Cookie 与 uin |
+| `KUGOU_COOKIE` / `KUGOU_TOKEN` / `KUGOU_USERID` | 酷狗登录凭据 |
 
 ---
 

@@ -35,6 +35,10 @@ interface PlayerContextType {
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
 
+const URL_TTL_MS = 30 * 60 * 1000; // 30 mins
+export const globalMediaUrlCache = new Map<string, { url: string; timestamp: number }>();
+export const globalLyricsCache = new Map<string, LyricLine[]>();
+
 export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
   const [playlist, setPlaylist] = useState<Song[]>([]);
@@ -51,6 +55,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const clearPlayError = () => setPlayError(null);
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const playRequestIdRef = useRef(0);
   const consecutiveFailuresRef = useRef(0);
 
   // Refs to ensure event handlers always read the latest state
@@ -88,6 +93,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   };
 
   const playSong = async (song: Song, list?: Song[], explicitIndex?: number, isAutoAdvance: boolean = false) => {
+    const requestId = ++playRequestIdRef.current;
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+
     setCurrentSong(song);
     setIsPlaying(false); // Pause while loading
     setLyrics([]);
@@ -111,14 +122,18 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const fetchFreshUrl = async (refresh: boolean = false): Promise<string | undefined> => {
       try {
         const url = await api.getMediaUrl(song, undefined, refresh);
+        if (playRequestIdRef.current !== requestId) return undefined;
         if (url) return url;
       } catch (err: unknown) {
+        if (playRequestIdRef.current !== requestId) return undefined;
         // Try alternative sources
         if (song.alternativeSources && song.alternativeSources.length > 0) {
           for (const alt of song.alternativeSources) {
+            if (playRequestIdRef.current !== requestId) return undefined;
             try {
               const altSong = { ...song, sourceId: alt.sourceId, raw: alt.raw };
               const altUrl = await api.getMediaUrl(altSong, undefined, refresh);
+              if (playRequestIdRef.current !== requestId) return undefined;
               if (altUrl) {
                 song.sourceId = alt.sourceId;
                 song.raw = alt.raw;
@@ -127,6 +142,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
             } catch (e) {}
           }
         }
+        if (playRequestIdRef.current !== requestId) return undefined;
         throw err;
       }
     };
@@ -134,41 +150,69 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     try {
       // 1. Prefer local offline copy
       const localUrl = await getLocalAudioUrl(song.id);
+      if (playRequestIdRef.current !== requestId) return;
 
-      // 2. Check cached URL expiration TTL (15 mins).
-      // If song.url exists but has no timestamp (legacy cache from state/storage), or if timestamp is >15 mins old, invalidate it immediately.
-      const URL_TTL_MS = 15 * 60 * 1000;
+      // 2. Check cached URL expiration TTL (30 mins).
+      // If song.url exists but has no timestamp (legacy cache from state/storage), or if timestamp is >30 mins old, invalidate it immediately.
       if (song.url && (!song.urlTimestamp || Date.now() - song.urlTimestamp > URL_TTL_MS)) {
         song.url = undefined;
         song.urlTimestamp = undefined;
       }
 
+      // 3. Check global URL cache if not present on current song object
+      if (!song.url && song.id) {
+        const cached = globalMediaUrlCache.get(song.id);
+        if (cached && Date.now() - cached.timestamp < URL_TTL_MS) {
+          song.url = cached.url;
+          song.urlTimestamp = cached.timestamp;
+        }
+      }
+
       let urlToPlay = localUrl || song.url;
       if (!urlToPlay) {
-        urlToPlay = await fetchFreshUrl(true);
+        urlToPlay = await fetchFreshUrl(false);
+        if (playRequestIdRef.current !== requestId) return;
         if (urlToPlay) {
           song.url = urlToPlay;
           song.urlTimestamp = Date.now();
+          if (song.id) {
+            globalMediaUrlCache.set(song.id, { url: urlToPlay, timestamp: song.urlTimestamp });
+          }
         }
       }
+
+      if (playRequestIdRef.current !== requestId) return;
 
       // Load lyrics in the background (non-blocking)
       const loadLyrics = async () => {
         let lrc = await getLocalLyrics(song.id);
+        if (playRequestIdRef.current !== requestId) return;
+        if (!lrc || lrc.length === 0) {
+          if (song.id && globalLyricsCache.has(song.id)) {
+            lrc = globalLyricsCache.get(song.id) || null;
+          }
+        }
         if (!lrc || lrc.length === 0) {
           lrc = await api.getLyrics(song).catch(() => []);
+          if (playRequestIdRef.current !== requestId) return;
           if (!lrc || lrc.length === 0) {
             if (song.alternativeSources && song.alternativeSources.length > 0) {
               for (const alt of song.alternativeSources) {
+                if (playRequestIdRef.current !== requestId) return;
                 if (alt.sourceId === song.sourceId) continue;
                 try {
                   const altSong = { ...song, sourceId: alt.sourceId, raw: alt.raw };
                   const altLrc = await api.getLyrics(altSong);
+                  if (playRequestIdRef.current !== requestId) return;
                   if (altLrc && altLrc.length > 0) { lrc = altLrc; break; }
                 } catch (e) {}
               }
             }
           }
+        }
+        if (playRequestIdRef.current !== requestId) return;
+        if (lrc && lrc.length > 0 && song.id) {
+          globalLyricsCache.set(song.id, lrc);
         }
         setLyrics(lrc || []);
       };
@@ -178,10 +222,15 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         audioRef.current.src = urlToPlay;
         try {
           await audioRef.current.play();
+          if (playRequestIdRef.current !== requestId) {
+            audioRef.current.pause();
+            return;
+          }
           setIsPlaying(true);
           consecutiveFailuresRef.current = 0;
           api.recordPlay(song).catch(console.error);
         } catch (playErr: unknown) {
+          if (playRequestIdRef.current !== requestId) return;
           const error = playErr as Error;
           if (error.name === 'AbortError' || error.name === 'NotAllowedError') {
             // AbortError = interrupted by a subsequent load (harmless)
@@ -193,14 +242,25 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           console.warn('[Player] Cached URL failed, fetching fresh URL for:', song.title);
           song.url = undefined; // invalidate cache
           song.urlTimestamp = undefined;
+          if (song.id) {
+            globalMediaUrlCache.delete(song.id);
+          }
           
           try {
             const freshUrl = await fetchFreshUrl(true);
+            if (playRequestIdRef.current !== requestId) return;
             if (freshUrl && audioRef.current) {
               song.url = freshUrl;
               song.urlTimestamp = Date.now();
+              if (song.id) {
+                globalMediaUrlCache.set(song.id, { url: freshUrl, timestamp: song.urlTimestamp });
+              }
               audioRef.current.src = freshUrl;
               await audioRef.current.play();
+              if (playRequestIdRef.current !== requestId) {
+                audioRef.current.pause();
+                return;
+              }
               setIsPlaying(true);
               consecutiveFailuresRef.current = 0;
               api.recordPlay(song).catch(console.error);
@@ -209,15 +269,20 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
               throw new Error('Fresh URL fetch returned empty result');
             }
           } catch (retryErr) {
+            if (playRequestIdRef.current !== requestId) return;
             console.error('[Player] Retry also failed:', retryErr);
             throw retryErr;
           }
         }
       }
     } catch (err: unknown) {
+      if (playRequestIdRef.current !== requestId) return;
       const error = err as Error;
       song.url = undefined;
       song.urlTimestamp = undefined;
+      if (song.id) {
+        globalMediaUrlCache.delete(song.id);
+      }
 
       if (error.name !== 'AbortError' && error.name !== 'NotAllowedError') {
         console.error('[Player] Playback failed for track:', song.title, err);
@@ -229,7 +294,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         if (consecutiveFailuresRef.current < maxFailures) {
           console.warn(`[Player] Track "${song.title}" failed during auto-advance, skipping to next track (${consecutiveFailuresRef.current}/${maxFailures})...`);
           setTimeout(() => {
-            playNext(true);
+            if (playRequestIdRef.current === requestId) {
+              playNext(true);
+            }
           }, 300);
           return;
         }
@@ -250,11 +317,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const mode = repeatModeRef.current;
 
     if (mode === 'one') {
-      const song = pl[idx];
-      if (song) {
-        song.url = undefined;
-        song.urlTimestamp = undefined;
-        playSong(song, pl, idx, true);
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+        audioRef.current.play().then(() => setIsPlaying(true)).catch(console.error);
       }
       return;
     }
@@ -276,11 +341,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const mode = repeatModeRef.current;
 
     if (autoAdvance && mode === 'one') {
-      const song = pl[idx];
-      if (song) {
-        song.url = undefined;
-        song.urlTimestamp = undefined;
-        playSong(song, pl, idx, true);
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0;
+        audioRef.current.play().then(() => setIsPlaying(true)).catch(console.error);
       }
       return;
     }
@@ -332,9 +395,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       setCurrentIndex(currentIndex - 1);
     } else if (index === currentIndex) {
       if (newPlaylist.length === 0) {
+        playRequestIdRef.current += 1;
         setCurrentSong(null);
         setIsPlaying(false);
-        audioRef.current?.pause();
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current.removeAttribute('src');
+          audioRef.current.load();
+        }
         setCurrentIndex(-1);
       } else {
         // play next
@@ -345,11 +413,16 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   };
 
   const clearQueue = () => {
+    playRequestIdRef.current += 1;
     setPlaylist([]);
     setCurrentIndex(-1);
     setCurrentSong(null);
     setIsPlaying(false);
-    audioRef.current?.pause();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.removeAttribute('src');
+      audioRef.current.load();
+    }
   };
 
   // Lock screen / notification / headset controls. Without this the OS media

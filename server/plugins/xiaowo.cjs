@@ -3,6 +3,7 @@
             "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const axios_1 = require("axios");
+const sourceHelpers = require("./_source-helpers.cjs");
 const he = require("he");
 const pageSize = 30;
 function artworkShort2Long(albumpicShort) {
@@ -476,58 +477,13 @@ const qualityLevels = {
     wav: "wav",
 };
 async function getMediaSource(musicItem, quality, refresh = false) {
-    let apiError = null;
-
-    // 1. Try public API first
-    try {
-        const res = (
-            await axios_1.default.get(`https://lxmusicapi.onrender.com/url/kw/${musicItem.id}/${qualityLevels[quality]}?refresh=${refresh}`, {
-                headers: {
-                    "X-Request-Key": "share-v3"
-                },
-                timeout: 5000,
-            })
-        ).data;
-        if (res && res.url && !res.url.includes("panspace.kuwo.cn") && (!res.msg || res.msg === "success")) {
-            return { url: res.url };
-        }
-    } catch (err) {
-        apiError = err;
-    }
-
-    // 2. Try local API
-    if (process.env.LX_API_URL) {
-        try {
-            const res = (
-                await axios_1.default.get(`${process.env.LX_API_URL}/url/kw/${musicItem.id}/${qualityLevels[quality]}?refresh=${refresh}`, {
-                    headers: {
-                        "X-Request-Key": "share-v3"
-                    },
-                    timeout: 5000,
-                })
-            ).data;
-            if (res && res.url && !res.url.includes("panspace.kuwo.cn") && (!res.msg || res.msg === "success")) {
-                return { url: res.url };
-            }
-        } catch (err) {
-            apiError = err;
-        }
-    }
-
-    if (process.env.NODE_ENV === 'test' || typeof globalThis.XMLHttpRequest !== 'undefined') {
-        throw apiError || new Error("无法获取播放链接");
-    }
-    try {
-        const fallbackRes = (await axios_1.default.get(`http://antiserver.kuwo.cn/anti.s?useless=1&format=mp3&rid=MUSIC_${musicItem.id}&response=url&type=convert_url3`, {
-            timeout: 5000
-        })).data;
-        if (typeof fallbackRes === 'string' && fallbackRes.startsWith('http')) {
-            return { url: fallbackRes };
-        }
-    } catch (fallbackErr) {
-        console.error("Kuwo antiserver fallback failed:", fallbackErr.message);
-    }
-    throw apiError || new Error("无法获取播放链接");
+    return sourceHelpers.resolveMedia({
+        lxSource: "kw",
+        lxId: musicItem.id,
+        quality: qualityLevels[quality],
+        refresh,
+        direct: () => sourceHelpers.kuwoUrl(musicItem.id, quality),
+    });
 }
 async function getMusicInfo(musicItem) {
     const res = (await axios_1.default.get("http://m.kuwo.cn/newh5/singles/songinfoandlrc", {

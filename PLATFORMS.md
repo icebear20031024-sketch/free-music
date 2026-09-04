@@ -56,6 +56,8 @@ npm run dist:linux    # AppImage + deb
 细节：
 
 - 打包后主进程**内嵌启动 Express**，端口由 `PORT` 决定（`.env` 里已是 15000），插件与 JSON 数据落在 `app.getPath('userData')/server`，不写入应用包内部。
+- 音源插件通过 `extraResources` 随包发出到 `resources/plugins`，启动时复制进 `userData/server/plugins`；改动插件后要同步提升 `plugin-manager.ts` 里的 `PLUGIN_BUNDLE_VERSION`，否则老安装会继续用旧副本。
+- 插件放在应用包外，那里没有 `node_modules`，所以插件的 `require("axios")` 由服务端自己的 require 代为解析，不依赖插件所在目录。
 - 全局快捷键：`Ctrl/Cmd+Shift+L` 开关悬浮歌词，`Ctrl/Cmd+Shift+←/→` 上下一首，`Ctrl/Cmd+Shift+Space` 播放暂停。
 - 托盘菜单同样可以开关悬浮歌词。
 - 悬浮歌词窗口是第二个 Vite 入口 `desktop-lyrics.html`，不会把主界面代码打进去。

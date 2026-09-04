@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { setupRoutes } from './routes';
+import { setupRoutes, isSameSong } from './routes';
 import { pluginManager } from './plugin-manager';
 import { dbService } from './services/db-service';
 import { DATA_DIR } from './utils/paths';
@@ -19,6 +19,9 @@ global.fetch = mockFetch;
 describe('Routes /api/download', () => {
   let getDownloadHandler: any;
   let postDownloadHandler: any;
+  let playHandler: any;
+  let lyricHandler: any;
+  let proxyHandler: any;
   let registerHandler: any;
   let loginHandler: any;
   let meHandler: any;
@@ -28,11 +31,14 @@ describe('Routes /api/download', () => {
   const mockApp = {
     get: vi.fn((path, handler) => {
       if (path === '/api/download') getDownloadHandler = handler;
+      if (path === '/api/proxy') proxyHandler = handler;
       if (path === '/api/auth/me') meHandler = handler;
       if (path === '/api/stats/top') topStatsHandler = handler;
     }),
     post: vi.fn((path, handler) => {
       if (path === '/api/download') postDownloadHandler = handler;
+      if (path === '/api/play') playHandler = handler;
+      if (path === '/api/lyric') lyricHandler = handler;
       if (path === '/api/auth/register') registerHandler = handler;
       if (path === '/api/auth/login') loginHandler = handler;
       if (path === '/api/stats/play') playStatsHandler = handler;
@@ -359,5 +365,226 @@ describe('Auth and Stats API Endpoints', () => {
     expect(statsJson.stats.length).toBe(1);
     expect(statsJson.stats[0].songId).toBe('songB');
     expect(statsJson.stats[0].playCount).toBe(2);
+  });
+});
+
+// The cross-source fallback only tries candidates this matcher accepts. Too
+// strict and a playable copy on another platform is never found; too loose and
+// the player silently swaps in a cover or a remix.
+describe('isSameSong', () => {
+  it('ignores version suffixes the platforms add to titles', () => {
+    expect(isSameSong('起风了', '买辣椒也用券', { title: '起风了 (旧版)', artist: '买辣椒也用券' })).toBe(true);
+    expect(isSameSong('孤勇者', '陈奕迅', {
+      title: '孤勇者-《英雄联盟：双城之战》动画剧集中文主题曲',
+      artist: '陈奕迅',
+    })).toBe(true);
+  });
+
+  it('accepts an original artist named in brackets', () => {
+    expect(isSameSong('起风了', '买辣椒也用券', { title: '起风了', artist: '冯沁苑(买辣椒也用券)' })).toBe(true);
+    expect(isSameSong('葬花', '李本恩', { title: '葬花', artist: '笑看人生-李本恩' })).toBe(true);
+  });
+
+  it('accepts one matching artist out of several', () => {
+    expect(isSameSong('小酒窝', '林俊杰', { title: '小酒窝', artist: '林俊杰/蔡卓妍' })).toBe(true);
+  });
+
+  it('reads the singer field when there is no artist field', () => {
+    expect(isSameSong('晴天', '周杰伦', { name: '晴天', singer: '周杰伦' })).toBe(true);
+  });
+
+  it('rejects a different song by the same artist', () => {
+    expect(isSameSong('晴天', '周杰伦', { title: '稻香', artist: '周杰伦' })).toBe(false);
+  });
+
+  it('rejects a cover by someone else', () => {
+    expect(isSameSong('晴天', '周杰伦', { title: '晴天', artist: '刘大壮' })).toBe(false);
+  });
+
+  it('rejects candidates with no usable title', () => {
+    expect(isSameSong('晴天', '周杰伦', { artist: '周杰伦' })).toBe(false);
+    expect(isSameSong('', '周杰伦', { title: '晴天', artist: '周杰伦' })).toBe(false);
+  });
+
+  it('falls back to the title alone when an artist is unknown', () => {
+    expect(isSameSong('晴天', '', { title: '晴天', artist: '周杰伦' })).toBe(true);
+    expect(isSameSong('晴天', '周杰伦', { title: '晴天' })).toBe(true);
+  });
+});
+
+describe('Caching in /api/play, /api/lyric, and /api/proxy', () => {
+  let playHandler: any;
+  let lyricHandler: any;
+  let proxyHandler: any;
+
+  const mockApp = {
+    get: vi.fn((path, handler) => {
+      if (path === '/api/proxy') proxyHandler = handler;
+    }),
+    post: vi.fn((path, handler) => {
+      if (path === '/api/play') playHandler = handler;
+      if (path === '/api/lyric') lyricHandler = handler;
+    }),
+  } as any;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupRoutes(mockApp);
+  });
+
+  it('caches /api/play responses and supports refresh=true bypass', async () => {
+    const mockPlugin = {
+      getMediaSource: vi.fn().mockResolvedValue({ url: 'https://cdn.example.com/play-1.mp3' }),
+    };
+    vi.mocked(pluginManager.getPlugin).mockReturnValue(mockPlugin as any);
+
+    const req1 = {
+      body: {
+        sourceId: 'xiaoyun',
+        musicItem: { id: 'cache-song-1', title: 'Song 1', artist: 'Artist 1' },
+        quality: 'standard',
+        refresh: false,
+      },
+    } as any;
+
+    let resData: any = null;
+    const res1 = {
+      json: vi.fn((data) => {
+        resData = data;
+        return res1;
+      }),
+      status: vi.fn(() => res1),
+    } as any;
+
+    // First call: calls plugin
+    await playHandler(req1, res1, vi.fn());
+    expect(resData.success).toBe(true);
+    expect(resData.url).toBe('https://cdn.example.com/play-1.mp3');
+    expect(mockPlugin.getMediaSource).toHaveBeenCalledTimes(1);
+
+    // Second call with same item: returns cached response, does not call plugin
+    const res2 = {
+      json: vi.fn((data) => {
+        resData = data;
+        return res2;
+      }),
+      status: vi.fn(() => res2),
+    } as any;
+    await playHandler(req1, res2, vi.fn());
+    expect(resData.success).toBe(true);
+    expect(resData.url).toBe('https://cdn.example.com/play-1.mp3');
+    expect(mockPlugin.getMediaSource).toHaveBeenCalledTimes(1); // Still 1!
+
+    // Third call with refresh=true: bypasses cache and calls plugin
+    const reqRefresh = {
+      body: {
+        ...req1.body,
+        refresh: true,
+      },
+    } as any;
+    mockPlugin.getMediaSource.mockResolvedValueOnce({ url: 'https://cdn.example.com/play-refreshed.mp3' });
+    await playHandler(reqRefresh, res2, vi.fn());
+    expect(mockPlugin.getMediaSource).toHaveBeenCalledTimes(2);
+    expect(resData.url).toBe('https://cdn.example.com/play-refreshed.mp3');
+  });
+
+  it('caches /api/lyric responses and reuses them on subsequent requests', async () => {
+    const mockPlugin = {
+      getLyric: vi.fn().mockResolvedValue({ lyric: '[00:00.00] Hello lyric' }),
+    };
+    vi.mocked(pluginManager.getPlugin).mockReturnValue(mockPlugin as any);
+
+    const req = {
+      body: {
+        sourceId: 'xiaoyun',
+        musicItem: { id: 'lyric-song-1' },
+      },
+    } as any;
+
+    let resData: any = null;
+    const res = {
+      json: vi.fn((data) => {
+        resData = data;
+        return res;
+      }),
+      status: vi.fn(() => res),
+    } as any;
+
+    // First call
+    await lyricHandler(req, res, vi.fn());
+    expect(mockPlugin.getLyric).toHaveBeenCalledTimes(1);
+    expect(resData.lyric).toBe('[00:00.00] Hello lyric');
+
+    // Second call: should hit cache
+    await lyricHandler(req, res, vi.fn());
+    expect(mockPlugin.getLyric).toHaveBeenCalledTimes(1); // Still 1!
+  });
+
+  it('caches audio stream on disk in /api/proxy and serves subsequent requests from disk cache', async () => {
+    const testAudioData = Buffer.from('RIFF....WAVEfmt ....data....');
+    const audioUrl = 'https://cdn.example.com/stream-cached-test.mp3';
+
+    // Mock first upstream fetch response
+    const { Readable } = await import('stream');
+    const webStream = Readable.toWeb(Readable.from([testAudioData]));
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: {
+        get: vi.fn((header) => {
+          if (header === 'content-type') return 'audio/mpeg';
+          if (header === 'content-length') return String(testAudioData.length);
+          return null;
+        }),
+        has: vi.fn((header) => header === 'accept-ranges'),
+      },
+      body: webStream,
+    });
+
+    const req1 = {
+      query: { url: audioUrl },
+      headers: {},
+    } as any;
+
+    const headers1: Record<string, string> = {};
+    const res1 = {
+      status: vi.fn(() => res1),
+      set: vi.fn((h) => {
+        Object.assign(headers1, h);
+        return res1;
+      }),
+      end: vi.fn(),
+      on: vi.fn(),
+      once: vi.fn(),
+      emit: vi.fn(),
+      write: vi.fn(),
+    } as any;
+
+    await proxyHandler(req1, res1, vi.fn());
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(headers1['X-Audio-Cache']).toBe('MISS');
+
+    // Wait briefly for disk write and rename to settle
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Second request: should hit disk cache (X-Audio-Cache: HIT) without calling fetch
+    const headers2: Record<string, string> = {};
+    const res2 = {
+      status: vi.fn(() => res2),
+      set: vi.fn((h) => {
+        Object.assign(headers2, h);
+        return res2;
+      }),
+      end: vi.fn(),
+      on: vi.fn(),
+      once: vi.fn(),
+      emit: vi.fn(),
+      write: vi.fn(),
+    } as any;
+
+    await proxyHandler(req1, res2, vi.fn());
+    expect(mockFetch).toHaveBeenCalledTimes(1); // No new fetch!
+    expect(headers2['X-Audio-Cache']).toBe('HIT');
+    expect(headers2['Content-Length']).toBe(String(testAudioData.length));
   });
 });

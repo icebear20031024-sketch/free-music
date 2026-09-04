@@ -24,6 +24,9 @@ async function bootServer(): Promise<RunningServer> {
   // JSON databases live under the per-user app data directory.
   process.env.MUSIC_DATA_DIR = path.join(app.getPath('userData'), 'server');
   process.env.MUSIC_STATIC_DIR = RENDERER_DIR;
+  process.env.MUSIC_BUNDLED_PLUGINS_DIR = isDev
+    ? path.join(APP_ROOT, 'server', 'plugins')
+    : path.join(process.resourcesPath, 'plugins');
   fs.mkdirSync(process.env.MUSIC_DATA_DIR, { recursive: true });
 
   return startServer({

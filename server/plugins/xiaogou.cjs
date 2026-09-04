@@ -3,6 +3,7 @@
         "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const axios_1 = require("axios");
+const sourceHelpers = require("./_source-helpers.cjs");
 const cheerio_1 = require("cheerio");
 const CryptoJs = require("crypto-js");
 const he = require("he");
@@ -163,43 +164,13 @@ const qualityLevels = {
     wav: "wav",
 };
 async function getMediaSource(musicItem, quality, refresh = false) {
-    // 1. Try public API first
-    try {
-        const res = (
-            await axios_1.default.get(`https://lxmusicapi.onrender.com/url/kg/${musicItem.id}/${qualityLevels[quality]}?refresh=${refresh}`, {
-                headers: {
-                    "X-Request-Key": "share-v3"
-                },
-                timeout: 5000,
-            })
-        ).data;
-        if (res && res.url && !res.url.includes("panspace.kuwo.cn") && (!res.msg || res.msg === "success")) {
-            return { url: res.url };
-        }
-    } catch (err) {
-        // Fallback to local
-    }
-
-    // 2. Try local API
-    if (process.env.LX_API_URL) {
-        try {
-            const res = (
-                await axios_1.default.get(`${process.env.LX_API_URL}/url/kg/${musicItem.id}/${qualityLevels[quality]}?refresh=${refresh}`, {
-                    headers: {
-                        "X-Request-Key": "share-v3"
-                    },
-                    timeout: 5000,
-                })
-            ).data;
-            if (res && res.url && !res.url.includes("panspace.kuwo.cn") && (!res.msg || res.msg === "success")) {
-                return { url: res.url };
-            }
-        } catch (err) {
-            // Fails
-        }
-    }
-
-    throw new Error("无法获取播放链接");
+    return sourceHelpers.resolveMedia({
+        lxSource: "kg",
+        lxId: musicItem.id,
+        quality: qualityLevels[quality],
+        refresh,
+        direct: () => sourceHelpers.kugouUrl(musicItem.album_audio_id),
+    });
 }
 async function getTopLists() {
     const lists = (await axios_1.default.get("http://mobilecdnbj.kugou.com/api/v3/rank/list?version=9108&plat=0&showtype=2&parentid=0&apiver=6&area_code=1&withsong=0&with_res_tag=0", {

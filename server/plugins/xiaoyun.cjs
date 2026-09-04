@@ -3,6 +3,7 @@
         "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const axios_1 = require("axios");
+const sourceHelpers = require("./_source-helpers.cjs");
 const CryptoJs = require("crypto-js");
 const qs = require("qs");
 const bigInt = require("big-integer");
@@ -441,62 +442,29 @@ const qualityLevels = {
     wav: "wav",
 };
 async function getMediaSource(musicItem, quality, refresh = false) {
-    let apiError = null;
-
-    // 1. Try public API first
-    try {
-        const res = (
-            await axios_1.default.get(`https://lxmusicapi.onrender.com/url/wy/${musicItem.id}/${qualityLevels[quality]}?refresh=${refresh}`, {
-                headers: {
-                    "X-Request-Key": "share-v3"
-                },
-                timeout: 6000,  // fail fast so fallback kicks in sooner
-            })
-        ).data;
-        if (res && res.url && !res.url.includes("panspace.kuwo.cn") && (!res.msg || res.msg === "success")) {
-            return { url: res.url };
-        }
-    } catch (err) {
-        apiError = err;
-    }
-
-    // 2. Try local API
-    if (process.env.LX_API_URL) {
-        try {
-            const res = (
-                await axios_1.default.get(`${process.env.LX_API_URL}/url/wy/${musicItem.id}/${qualityLevels[quality]}?refresh=${refresh}`, {
-                    headers: {
-                        "X-Request-Key": "share-v3"
-                    },
-                    timeout: 6000,
-                })
-            ).data;
-            if (res && res.url && !res.url.includes("panspace.kuwo.cn") && (!res.msg || res.msg === "success")) {
-                return { url: res.url };
+    return sourceHelpers.resolveMedia({
+        lxSource: "wy",
+        lxId: musicItem.id,
+        quality: qualityLevels[quality],
+        refresh,
+        direct: async () => {
+            const direct = await sourceHelpers.neteaseUrl(musicItem.id, quality);
+            if (direct) return direct;
+            // NetEase official outer link — works for copyright-free tracks.
+            // HEAD it first: restricted tracks answer with an HTML error page.
+            const outerUrl = `https://music.163.com/song/media/outer/url?id=${musicItem.id}.mp3`;
+            const headRes = await axios_1.default.head(outerUrl, {
+                timeout: 4000,
+                maxRedirects: 5,
+                validateStatus: () => true,
+            });
+            const contentType = headRes.headers["content-type"] || "";
+            if (contentType.includes("audio") || contentType.includes("octet-stream")) {
+                return outerUrl;
             }
-        } catch (err) {
-            apiError = err;
-        }
-    }
-
-    // Fallback: NetEase official outer link — works for copyright-free tracks.
-    // Use HEAD request to verify it's actually audio and not an HTML error page.
-    try {
-        const outerUrl = `https://music.163.com/song/media/outer/url?id=${musicItem.id}.mp3`;
-        const headRes = await axios_1.default.head(outerUrl, {
-            timeout: 4000,
-            maxRedirects: 5,
-            validateStatus: () => true,
-        });
-        const contentType = headRes.headers['content-type'] || '';
-        if (contentType.includes('audio') || contentType.includes('octet-stream')) {
-            return { url: outerUrl };
-        }
-        // Content-Type is HTML (copyright restriction) — skip fallback
-    } catch (_headErr) {
-        // HEAD request failed — skip fallback
-    }
-    throw apiError || new Error("无法获取播放链接");
+            return null;
+        },
+    });
 }
 const headers = {
     authority: "music.163.com",

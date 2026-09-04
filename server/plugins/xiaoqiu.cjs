@@ -3,6 +3,7 @@
         "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const axios_1 = require("axios");
+const sourceHelpers = require("./_source-helpers.cjs");
 const CryptoJs = require("crypto-js");
 const he = require("he");
 const pageSize = 20;
@@ -486,43 +487,13 @@ const qualityLevels = {
     wav: "wav",
 };
 async function getMediaSource(musicItem, quality, refresh = false) {
-    // 1. Try public API first
-    try {
-        const res = (
-            await axios_1.default.get(`https://lxmusicapi.onrender.com/url/tx/${musicItem.songmid}/${qualityLevels[quality]}?refresh=${refresh}`, {
-                headers: {
-                    "X-Request-Key": "share-v3"
-                },
-                timeout: 5000,
-            })
-        ).data;
-        if (res && res.url && !res.url.includes("panspace.kuwo.cn") && (!res.msg || res.msg === "success")) {
-            return { url: res.url };
-        }
-    } catch (err) {
-        // Fallback to local
-    }
-
-    // 2. Try local API
-    if (process.env.LX_API_URL) {
-        try {
-            const res = (
-                await axios_1.default.get(`${process.env.LX_API_URL}/url/tx/${musicItem.songmid}/${qualityLevels[quality]}?refresh=${refresh}`, {
-                    headers: {
-                        "X-Request-Key": "share-v3"
-                    },
-                    timeout: 5000,
-                })
-            ).data;
-            if (res && res.url && !res.url.includes("panspace.kuwo.cn") && (!res.msg || res.msg === "success")) {
-                return { url: res.url };
-            }
-        } catch (err) {
-            // Fails
-        }
-    }
-
-    throw new Error("无法获取播放链接");
+    return sourceHelpers.resolveMedia({
+        lxSource: "tx",
+        lxId: musicItem.songmid,
+        quality: qualityLevels[quality],
+        refresh,
+        direct: () => sourceHelpers.qqUrl(musicItem.songmid, quality),
+    });
 }
 module.exports = {
     platform: "小秋音乐",
